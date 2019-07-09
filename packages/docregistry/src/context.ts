@@ -602,17 +602,7 @@ export class Context<T extends DocumentRegistry.IModel>
         if (this.isDisposed) {
           return Promise.reject(new Error('Disposed'));
         }
-        // We want to check last_modified (disk) > last_modified (client)
-        // (our last save)
-        // In some cases the filesystem reports an inconsistent time,
-        // so we allow 0.5 seconds difference before complaining.
-        let modified = this.contentsModel && this.contentsModel.last_modified;
-        let tClient = new Date(modified);
-        let tDisk = new Date(model.last_modified);
-        if (modified && tDisk.getTime() - tClient.getTime() > 500) {
-          // 500 ms
-          return this._timeConflict(tClient, model, options);
-        }
+
         return this._manager.contents.save(path, options);
       },
       err => {
@@ -688,35 +678,12 @@ export class Context<T extends DocumentRegistry.IModel>
   ): Promise<Contents.IModel> {
     let tDisk = new Date(model.last_modified);
     console.warn(
-      `Last saving performed ${tClient} ` +
+      `IGNORING - Last saving performed ${tClient} ` +
         `while the current file seems to have been saved ` +
         `${tDisk}`
     );
-    let body =
-      `"${this.path}" has changed on disk since the last time it ` +
-      `was opened or saved. ` +
-      `Do you want to overwrite the file on disk with the version ` +
-      ` open here, or load the version on disk (revert)?`;
-    let revertBtn = Dialog.okButton({ label: 'Revert' });
-    let overwriteBtn = Dialog.warnButton({ label: 'Overwrite' });
-    return showDialog({
-      title: 'File Changed',
-      body,
-      buttons: [Dialog.cancelButton(), revertBtn, overwriteBtn]
-    }).then(result => {
-      if (this.isDisposed) {
-        return Promise.reject(new Error('Disposed'));
-      }
-      if (result.button.label === 'Overwrite') {
-        return this._manager.contents.save(this._path, options);
-      }
-      if (result.button.label === 'Revert') {
-        return this.revert().then(() => {
-          return model;
-        });
-      }
-      return Promise.reject(new Error('Cancel')); // Otherwise cancel the save.
-    });
+    // Keep this here just incase I missed a call somewhere
+    return this._manager.contents.save(this._path, options);
   }
 
   /**
