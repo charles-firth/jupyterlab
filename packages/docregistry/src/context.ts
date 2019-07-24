@@ -602,6 +602,13 @@ export class Context<T extends DocumentRegistry.IModel>
         if (this.isDisposed) {
           return Promise.reject(new Error('Disposed'));
         }
+        let modified = this.contentsModel && this.contentsModel.last_modified;
+        let tClient = new Date(modified);
+        let tDisk = new Date(model.last_modified);
+        if (modified && tDisk.getTime() - tClient.getTime() > 500) {
+          // 500 ms
+          return this._timeConflict(tClient, model, options);
+        }
 
         return this._manager.contents.save(path, options);
       },
