@@ -91,6 +91,18 @@ export namespace Kernel {
     readonly ready: Promise<void>;
 
     /**
+     * Whether the kernel connection handles comm messages.
+     *
+     * #### Notes
+     * The comm message protocol currently has implicit assumptions that only
+     * one kernel connection is handling comm messages. This option allows a
+     * kernel connection to opt out of handling comms.
+     *
+     * See https://github.com/jupyter/jupyter_client/issues/263
+     */
+    handleComms: boolean;
+
+    /**
      * Get the kernel spec.
      *
      * @returns A promise that resolves with the kernel spec for this kernel.
@@ -276,6 +288,30 @@ export namespace Kernel {
     ): Kernel.IShellFuture<
       KernelMessage.IExecuteRequestMsg,
       KernelMessage.IExecuteReplyMsg
+    >;
+
+    /**
+     * Send an experimental `debug_request` message.
+     *
+     * @hidden
+     *
+     * @param content - The content of the request.
+     *
+     * @param disposeOnDone - Whether to dispose of the future when done.
+     *
+     * @returns A kernel future.
+     *
+     * #### Notes
+     * Debug messages are experimental messages that are not in the official
+     * kernel message specification. As such, this function is *NOT* considered
+     * part of the public API, and may change without notice.
+     */
+    requestDebug(
+      content: KernelMessage.IDebugRequestMsg['content'],
+      disposeOnDone?: boolean
+    ): Kernel.IControlFuture<
+      KernelMessage.IDebugRequestMsg,
+      KernelMessage.IDebugReplyMsg
     >;
 
     /**
@@ -604,6 +640,13 @@ export namespace Kernel {
     name?: string;
 
     /**
+     * Environment variables passed to the kernelspec (used in Enterprise Gateway)
+     */
+    env?: {
+      [key: string]: string;
+    };
+
+    /**
      * The server settings for the kernel.
      */
     serverSettings?: ServerConnection.ISettings;
@@ -612,6 +655,18 @@ export namespace Kernel {
      * The username of the kernel client.
      */
     username?: string;
+
+    /**
+     * Whether the kernel connection should handle comm messages
+     *
+     * #### Notes
+     * The comm message protocol currently has implicit assumptions that only
+     * one kernel connection is handling comm messages. This option allows a
+     * kernel connection to opt out of handling comms.
+     *
+     * See https://github.com/jupyter/jupyter_client/issues/263
+     */
+    handleComms?: boolean;
 
     /**
      * The unique identifier for the kernel client.
@@ -1013,6 +1068,11 @@ export namespace Kernel {
      * A mapping of resource file name to download path.
      */
     readonly resources: { [key: string]: string };
+
+    /**
+     * A dictionary of additional attributes about this kernel; used by clients to aid in kernel selection.
+     */
+    readonly metadata?: JSONObject;
   }
 
   /**

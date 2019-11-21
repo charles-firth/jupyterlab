@@ -254,7 +254,7 @@ const tree: JupyterFrontEndPlugin<void> = {
     const { commands } = app;
     const treePattern = new RegExp(`^${paths.urls.tree}([^?]+)`);
     const workspacePattern = new RegExp(
-      `^${paths.urls.workspaces}[^?\/]+/tree/([^?]+)`
+      `^${paths.urls.workspaces}/[^?/]+/tree/([^?]+)`
     );
 
     commands.addCommand(CommandIDs.tree, {
@@ -263,20 +263,31 @@ const tree: JupyterFrontEndPlugin<void> = {
         const workspaceMatch = args.path.match(workspacePattern);
         const match = treeMatch || workspaceMatch;
         const path = decodeURI(match[1]);
-        // const { page, workspaces } = info.urls;
         const workspace = PathExt.basename(resolver.name);
+        const query = URLExt.queryStringToObject(args.search);
+        const fileBrowserPath = query['file-browser-path'];
+
+        // Remove the file browser path from the query string.
+        delete query['file-browser-path'];
+
+        // Remove the tree portion of the URL.
         const url =
           (workspaceMatch
             ? URLExt.join(paths.urls.workspaces, workspace)
             : paths.urls.app) +
-          args.search +
+          URLExt.objectToQueryString(query) +
           args.hash;
 
-        // Remove the tree portion of the URL leaving the rest intact.
         router.navigate(url);
 
         try {
           await commands.execute('filebrowser:open-path', { path });
+
+          if (fileBrowserPath) {
+            await commands.execute('filebrowser:open-path', {
+              path: fileBrowserPath
+            });
+          }
         } catch (error) {
           console.warn('Tree routing failed.', error);
         }

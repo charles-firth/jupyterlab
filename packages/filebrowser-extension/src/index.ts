@@ -43,6 +43,8 @@ import { Contents } from '@jupyterlab/services';
 
 import { IStatusBar } from '@jupyterlab/statusbar';
 
+import { IIconRegistry } from '@jupyterlab/ui-components';
+
 import { IIterator, map, reduce, toArray } from '@phosphor/algorithm';
 
 import { CommandRegistry } from '@phosphor/commands';
@@ -84,6 +86,10 @@ namespace CommandIDs {
   export const paste = 'filebrowser:paste';
 
   export const createNewDirectory = 'filebrowser:create-new-directory';
+
+  export const createNewFile = 'filebrowser:create-new-file';
+
+  export const createNewMarkdownFile = 'filebrowser:create-new-markdown-file';
 
   export const rename = 'filebrowser:rename';
 
@@ -128,7 +134,7 @@ const factory: JupyterFrontEndPlugin<IFileBrowserFactory> = {
   activate: activateFactory,
   id: '@jupyterlab/filebrowser-extension:factory',
   provides: IFileBrowserFactory,
-  requires: [IDocumentManager, IStateDB]
+  requires: [IIconRegistry, IDocumentManager, IStateDB]
 };
 
 /**
@@ -155,12 +161,17 @@ const shareFile: JupyterFrontEndPlugin<void> = {
 export const fileUploadStatus: JupyterFrontEndPlugin<void> = {
   id: '@jupyterlab/filebrowser-extension:file-upload-status',
   autoStart: true,
-  requires: [IStatusBar, IFileBrowserFactory],
+  requires: [IFileBrowserFactory],
+  optional: [IStatusBar],
   activate: (
     app: JupyterFrontEnd,
-    statusBar: IStatusBar,
-    browser: IFileBrowserFactory
+    browser: IFileBrowserFactory,
+    statusBar: IStatusBar | null
   ) => {
+    if (!statusBar) {
+      // Automatically disable if statusbar missing
+      return;
+    }
     const item = new FileUploadStatus({
       tracker: browser.tracker
     });
@@ -200,6 +211,7 @@ export default plugins;
  */
 function activateFactory(
   app: JupyterFrontEnd,
+  icoReg: IIconRegistry,
   docManager: IDocumentManager,
   state: IStateDB
 ): IFileBrowserFactory {
@@ -210,6 +222,7 @@ function activateFactory(
     options: IFileBrowserFactory.IOptions = {}
   ) => {
     const model = new FileBrowserModel({
+      iconRegistry: icoReg,
       manager: docManager,
       driveName: options.driveName || '',
       refreshInterval: options.refreshInterval,
@@ -474,12 +487,14 @@ function addCommands(
     caption: args => (args.path ? `Open ${args.path}` : 'Open from path'),
     execute: async ({ path }: { path?: string }) => {
       if (!path) {
-        path = (await InputDialog.getText({
-          label: 'Path',
-          placeholder: '/path/relative/to/jlab/root',
-          title: 'Open Path',
-          okLabel: 'Open'
-        })).value;
+        path = (
+          await InputDialog.getText({
+            label: 'Path',
+            placeholder: '/path/relative/to/jlab/root',
+            title: 'Open Path',
+            okLabel: 'Open'
+          })
+        ).value;
       }
       if (!path) {
         return;
@@ -528,11 +543,13 @@ function addCommands(
         return;
       }
 
+      const { contents } = widget.model.manager.services;
       return Promise.all(
         toArray(
           map(widget.selectedItems(), item => {
             if (item.type === 'directory') {
-              return widget.model.cd(`/${item.path}`);
+              const localPath = contents.localPath(item.path);
+              return widget.model.cd(`/${localPath}`);
             }
 
             return commands.execute('docmanager:open', {
@@ -627,6 +644,36 @@ function addCommands(
     },
     iconClass: 'jp-MaterialIcon jp-NewFolderIcon',
     label: 'New Folder'
+  });
+
+  commands.addCommand(CommandIDs.createNewFile, {
+    execute: () => {
+      const {
+        model: { path }
+      } = browser;
+      commands.execute('docmanager:new-untitled', {
+        path,
+        type: 'file',
+        ext: 'txt'
+      });
+    },
+    iconClass: 'jp-MaterialIcon jp-TextEditorIcon',
+    label: 'New File'
+  });
+
+  commands.addCommand(CommandIDs.createNewMarkdownFile, {
+    execute: () => {
+      const {
+        model: { path }
+      } = browser;
+      commands.execute('docmanager:new-untitled', {
+        path,
+        type: 'file',
+        ext: 'md'
+      });
+    },
+    iconClass: 'jp-MaterialIcon jp-MarkdownIcon',
+    label: 'New Markdown File'
   });
 
   commands.addCommand(CommandIDs.rename, {
@@ -831,9 +878,21 @@ function addCommands(
   });
 
   app.contextMenu.addItem({
-    command: CommandIDs.paste,
+    command: CommandIDs.createNewFile,
     selector: selectorContent,
     rank: 2
+  });
+
+  app.contextMenu.addItem({
+    command: CommandIDs.createNewMarkdownFile,
+    selector: selectorContent,
+    rank: 3
+  });
+
+  app.contextMenu.addItem({
+    command: CommandIDs.paste,
+    selector: selectorContent,
+    rank: 4
   });
 
   app.contextMenu.addItem({

@@ -142,6 +142,29 @@ If you ignore the rebuild notice by mistake, simply refresh your browser
 window to trigger a new rebuild check.
 
 
+Disabling Rebuild Checks
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+In some cases, such as automated testing, you may wish to disable the startup
+rebuild checks altogether. This can be achieved through setting ``buildCheck``
+and ``buildAvailable`` in ``jupyter_notebook_config.json`` (or ``.py`` equivalent)
+in any of the ``config`` locations returned by ``jupyter --paths``.
+
+
+.. code:: json
+
+    {
+      "LabApp": {
+        "tornado_settings": {
+          "page_config_data": {
+            "buildCheck": false,
+            "buildAvailable": false,
+          }
+        }
+      }
+    }
+
+
 Managing Installed Extensions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -304,6 +327,23 @@ If you wish to run JupyterLab with the set of pinned requirements that was
 shipped with the Python package, you can launch as
 ``jupyter lab --core-mode``.
 
+**Note**
+
+The build process uses a specific ``yarn`` version with a default working 
+combination of npm packages stored in a ``yarn.lock`` file shipped with
+JupyterLab. Those package source urls point to the default yarn registry.
+But if you defined your own yarn registry in yarn configuration, the 
+default yarn registry will be replaced by your custom registry.
+
+If then you switch back to the default yarn registry, you will need to 
+clean your ``staging`` folder before building:
+
+.. code:: bash
+
+    jupyter lab clean
+    jupyter lab build
+
+
 JupyterLab Application Directory
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -453,7 +493,7 @@ staging and static
 ''''''''''''''''''
 
 The ``static`` directory contains the assets that will be loaded by the
-JuptyerLab application. The ``staging`` directory is used to create the
+JupyterLab application. The ``staging`` directory is used to create the
 build and then populate the ``static`` directory.
 
 Running ``jupyter lab`` will attempt to run the ``static`` assets in the

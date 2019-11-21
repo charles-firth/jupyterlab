@@ -157,7 +157,11 @@ namespace CommandIDs {
 
   export const extendAbove = 'notebook:extend-marked-cells-above';
 
+  export const extendTop = 'notebook:extend-marked-cells-top';
+
   export const extendBelow = 'notebook:extend-marked-cells-below';
+
+  export const extendBottom = 'notebook:extend-marked-cells-bottom';
 
   export const selectAll = 'notebook:select-all';
 
@@ -172,6 +176,8 @@ namespace CommandIDs {
   export const commandMode = 'notebook:enter-command-mode';
 
   export const toggleAllLines = 'notebook:toggle-all-cell-line-numbers';
+
+  export const toggleRecordTiming = 'notebook:toggle-record-timing';
 
   export const undoCellAction = 'notebook:undo-cell-action';
 
@@ -306,12 +312,17 @@ const tools: JupyterFrontEndPlugin<INotebookTools> = {
 export const commandEditItem: JupyterFrontEndPlugin<void> = {
   id: '@jupyterlab/notebook-extension:mode-status',
   autoStart: true,
-  requires: [IStatusBar, INotebookTracker],
+  requires: [INotebookTracker],
+  optional: [IStatusBar],
   activate: (
     app: JupyterFrontEnd,
-    statusBar: IStatusBar,
-    tracker: INotebookTracker
+    tracker: INotebookTracker,
+    statusBar: IStatusBar | null
   ) => {
+    if (!statusBar) {
+      // Automatically disable if statusbar missing
+      return;
+    }
     const { shell } = app;
     const item = new CommandEditStatus();
 
@@ -339,12 +350,17 @@ export const commandEditItem: JupyterFrontEndPlugin<void> = {
 export const notebookTrustItem: JupyterFrontEndPlugin<void> = {
   id: '@jupyterlab/notebook-extension:trust-status',
   autoStart: true,
-  requires: [IStatusBar, INotebookTracker, ILabShell],
+  requires: [INotebookTracker],
+  optional: [IStatusBar],
   activate: (
     app: JupyterFrontEnd,
-    statusBar: IStatusBar,
-    tracker: INotebookTracker
+    tracker: INotebookTracker,
+    statusBar: IStatusBar | null
   ) => {
+    if (!statusBar) {
+      // Automatically disable if statusbar missing
+      return;
+    }
     const { shell } = app;
     const item = new NotebookTrustStatus();
 
@@ -1454,6 +1470,17 @@ function addCommands(
     },
     isEnabled
   });
+  commands.addCommand(CommandIDs.extendTop, {
+    label: 'Extend Selection to Top',
+    execute: args => {
+      const current = getCurrent(args);
+
+      if (current) {
+        return NotebookActions.extendSelectionAbove(current.content, true);
+      }
+    },
+    isEnabled
+  });
   commands.addCommand(CommandIDs.extendBelow, {
     label: 'Extend Selection Below',
     execute: args => {
@@ -1461,6 +1488,17 @@ function addCommands(
 
       if (current) {
         return NotebookActions.extendSelectionBelow(current.content);
+      }
+    },
+    isEnabled
+  });
+  commands.addCommand(CommandIDs.extendBottom, {
+    label: 'Extend Selection to Bottom',
+    execute: args => {
+      const current = getCurrent(args);
+
+      if (current) {
+        return NotebookActions.extendSelectionBelow(current.content, true);
       }
     },
     isEnabled
@@ -1516,6 +1554,17 @@ function addCommands(
 
       if (current) {
         return NotebookActions.toggleAllLineNumbers(current.content);
+      }
+    },
+    isEnabled
+  });
+  commands.addCommand(CommandIDs.toggleRecordTiming, {
+    label: 'Toggle Recording Cell Timing',
+    execute: args => {
+      const current = getCurrent(args);
+
+      if (current) {
+        return NotebookActions.toggleRecordTiming(current.content);
       }
     },
     isEnabled
@@ -1653,9 +1702,11 @@ function addCommands(
         return;
       }
 
-      return Private.createConsole(commands, current, args[
-        'activate'
-      ] as boolean);
+      return Private.createConsole(
+        commands,
+        current,
+        args['activate'] as boolean
+      );
     },
     isEnabled
   });
@@ -1858,6 +1909,7 @@ function populatePalette(
     CommandIDs.deselectAll,
     CommandIDs.clearAllOutputs,
     CommandIDs.toggleAllLines,
+    CommandIDs.toggleRecordTiming,
     CommandIDs.editMode,
     CommandIDs.commandMode,
     CommandIDs.changeKernel,
@@ -1898,7 +1950,9 @@ function populatePalette(
     CommandIDs.selectAbove,
     CommandIDs.selectBelow,
     CommandIDs.extendAbove,
+    CommandIDs.extendTop,
     CommandIDs.extendBelow,
+    CommandIDs.extendBottom,
     CommandIDs.moveDown,
     CommandIDs.moveUp,
     CommandIDs.undoCellAction,

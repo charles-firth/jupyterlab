@@ -36,11 +36,13 @@ describe('@jupyterlab/notebook', () => {
     let session: ClientSession;
     let ipySession: ClientSession;
 
-    before(async () => {
-      session = await createClientSession();
-      ipySession = await createClientSession({
-        kernelPreference: { name: 'ipython' }
-      });
+    before(async function() {
+      // tslint:disable-next-line:no-invalid-this
+      this.timeout(60000);
+      [session, ipySession] = await Promise.all([
+        createClientSession(),
+        createClientSession({ kernelPreference: { name: 'ipython' } })
+      ]);
       await Promise.all([ipySession.initialize(), session.initialize()]);
       await Promise.all([ipySession.kernel.ready, session.kernel.ready]);
     });
@@ -63,8 +65,8 @@ describe('@jupyterlab/notebook', () => {
       NBTestUtils.clipboard.clear();
     });
 
-    after(() => {
-      return Promise.all([session.shutdown(), ipySession.shutdown()]);
+    after(async () => {
+      await Promise.all([session.shutdown(), ipySession.shutdown()]);
     });
 
     describe('#executed', () => {
@@ -916,6 +918,14 @@ describe('@jupyterlab/notebook', () => {
         expect(widget.isSelected(widget.widgets[0])).to.equal(true);
       });
 
+      it('should extend the selection to the topmost cell', () => {
+        widget.activeCellIndex = 1;
+        NotebookActions.extendSelectionAbove(widget, true);
+        for (let i = widget.activeCellIndex; i >= 0; i--) {
+          expect(widget.isSelected(widget.widgets[i])).to.equal(true);
+        }
+      });
+
       it('should be a no-op if there is no model', () => {
         widget.model = null;
         NotebookActions.extendSelectionAbove(widget);
@@ -968,6 +978,12 @@ describe('@jupyterlab/notebook', () => {
         expect(widget.isSelected(widget.widgets[1])).to.equal(true);
       });
 
+      it('should extend the selection the bottomost cell', () => {
+        NotebookActions.extendSelectionBelow(widget, true);
+        for (let i = widget.activeCellIndex; i < widget.widgets.length; i++) {
+          expect(widget.isSelected(widget.widgets[i])).to.equal(true);
+        }
+      });
       it('should be a no-op if there is no model', () => {
         widget.model = null;
         NotebookActions.extendSelectionBelow(widget);

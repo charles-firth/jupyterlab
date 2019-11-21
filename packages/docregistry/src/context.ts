@@ -271,6 +271,25 @@ export class Context<T extends DocumentRegistry.IModel>
   }
 
   /**
+   * Download a file.
+   *
+   * @param path - The path of the file to be downloaded.
+   *
+   * @returns A promise which resolves when the file has begun
+   *   downloading.
+   */
+  async download(): Promise<void> {
+    const url = await this._manager.contents.getDownloadUrl(this._path);
+    let element = document.createElement('a');
+    element.href = url;
+    element.download = '';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+    return void 0;
+  }
+
+  /**
    * Revert the document contents to disk contents.
    */
   revert(): Promise<void> {
@@ -372,9 +391,11 @@ export class Context<T extends DocumentRegistry.IModel>
       let changeModel = change.newValue;
       // When folder name changed, `oldPath` is `foo`, `newPath` is `bar` and `this._path` is `foo/test`,
       // we should update `foo/test` to `bar/test` as well
+
       if (oldPath !== this._path) {
-        newPath = this._path.replace(new RegExp(`^${oldPath}`), newPath);
+        newPath = this._path.replace(new RegExp(`^${oldPath}/`), `${newPath}/`);
         oldPath = this._path;
+
         // Update client file model from folder change
         changeModel = {
           last_modified: change.newValue.created,
@@ -577,11 +598,12 @@ export class Context<T extends DocumentRegistry.IModel>
           return this._populate();
         }
       })
-      .catch(err => {
+      .catch(async err => {
         const localPath = this._manager.contents.localPath(this._path);
         const name = PathExt.basename(localPath);
+        const response = await err.response.json();
         if (err.message === 'Invalid response: 400 bad format') {
-          err = new Error('JupyterLab is unable to open this file type.');
+          err = new Error(response.message);
         }
         void this._handleError(err, `File Load Error for ${name}`);
         throw err;

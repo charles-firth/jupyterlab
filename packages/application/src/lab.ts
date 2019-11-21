@@ -25,21 +25,18 @@ export class JupyterLab extends JupyterFrontEnd<ILabShell> {
    * Construct a new JupyterLab object.
    */
   constructor(options: JupyterLab.IOptions = { shell: new LabShell() }) {
-    super({ shell: options.shell || new LabShell() });
+    super({ ...options, shell: options.shell || new LabShell() });
     this.restored = this.shell.restored
       .then(() => undefined)
       .catch(() => undefined);
 
     // Create an IInfo dictionary from the options to override the defaults.
-    const info = Object.keys(JupyterLab.defaultInfo).reduce(
-      (acc, val) => {
-        if (val in options) {
-          (acc as any)[val] = JSON.parse(JSON.stringify((options as any)[val]));
-        }
-        return acc;
-      },
-      {} as Partial<JupyterLab.IInfo>
-    );
+    const info = Object.keys(JupyterLab.defaultInfo).reduce((acc, val) => {
+      if (val in options) {
+        (acc as any)[val] = JSON.parse(JSON.stringify((options as any)[val]));
+      }
+      return acc;
+    }, {} as Partial<JupyterLab.IInfo>);
 
     // Populate application info.
     this._info = { ...JupyterLab.defaultInfo, ...info };
@@ -246,7 +243,9 @@ export namespace JupyterLab {
       tree: PageConfig.getOption('treeUrl'),
       workspaces: PageConfig.getOption('workspacesUrl'),
       hubHost: PageConfig.getOption('hubHost') || undefined,
-      hubPrefix: PageConfig.getOption('hubPrefix') || undefined
+      hubPrefix: PageConfig.getOption('hubPrefix') || undefined,
+      hubUser: PageConfig.getOption('hubUser') || undefined,
+      hubServerName: PageConfig.getOption('hubServerName') || undefined
     },
     directories: {
       appSettings: PageConfig.getOption('appSettingsDir'),

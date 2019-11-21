@@ -251,7 +251,7 @@ export class ClientSession implements IClientSession {
   /**
    * A signal emitted for iopub kernel messages.
    */
-  get iopubMessage(): ISignal<this, KernelMessage.IMessage> {
+  get iopubMessage(): ISignal<this, KernelMessage.IIOPubMessage> {
     return this._iopubMessage;
   }
 
@@ -373,6 +373,7 @@ export class ClientSession implements IClientSession {
           console.error(`Kernel not shut down ${reason}`);
         });
       }
+      this._session.dispose();
       this._session = null;
     }
     if (this._dialog) {
@@ -585,7 +586,10 @@ export class ClientSession implements IClientSession {
     }
     let session = this._session;
     if (session && session.status !== 'dead') {
-      return session.changeKernel(options);
+      return session.changeKernel(options).catch(err => {
+        void this._handleSessionError(err);
+        return Promise.reject(err);
+      });
     } else {
       return this._startSession(options);
     }
@@ -826,7 +830,7 @@ export class ClientSession implements IClientSession {
   private _terminated = new Signal<this, void>(this);
   private _kernelChanged = new Signal<this, Session.IKernelChangedArgs>(this);
   private _statusChanged = new Signal<this, Kernel.Status>(this);
-  private _iopubMessage = new Signal<this, KernelMessage.IMessage>(this);
+  private _iopubMessage = new Signal<this, KernelMessage.IIOPubMessage>(this);
   private _unhandledMessage = new Signal<this, KernelMessage.IMessage>(this);
   private _propertyChanged = new Signal<this, 'path' | 'name' | 'type'>(this);
   private _dialog: Dialog<any> | null = null;

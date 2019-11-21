@@ -20,6 +20,8 @@ import { DocumentRegistry } from '@jupyterlab/docregistry';
 
 import { Contents } from '@jupyterlab/services';
 
+import { IIconRegistry } from '@jupyterlab/ui-components';
+
 import {
   ArrayExt,
   ArrayIterator,
@@ -111,9 +113,14 @@ const NAME_ID_CLASS = 'jp-id-name';
 const MODIFIED_ID_CLASS = 'jp-id-modified';
 
 /**
- * The mime type for a con tents drag object.
+ * The mime type for a contents drag object.
  */
 const CONTENTS_MIME = 'application/x-jupyter-icontents';
+
+/**
+ * The mime type for a rich contents drag object.
+ */
+const CONTENTS_MIME_RICH = 'application/x-jupyter-icontentsrich';
 
 /**
  * The class name added to drop targets.
@@ -186,7 +193,9 @@ export class DirListing extends Widget {
    */
   constructor(options: DirListing.IOptions) {
     super({
-      node: (options.renderer || DirListing.defaultRenderer).createNode()
+      node: (options.renderer =
+        options.renderer ||
+        new DirListing.Renderer(options.model.iconRegistry)).createNode()
     });
     this.addClass(DIR_LISTING_CLASS);
     this._model = options.model;
@@ -196,7 +205,7 @@ export class DirListing extends Widget {
     this._editNode = document.createElement('input');
     this._editNode.className = EDITOR_CLASS;
     this._manager = this._model.manager;
-    this._renderer = options.renderer || DirListing.defaultRenderer;
+    this._renderer = options.renderer;
 
     const headerNode = DOMUtils.findElement(this.node, HEADER_CLASS);
     this._renderer.populateHeaderNode(headerNode);
@@ -921,8 +930,9 @@ export class DirListing extends Widget {
   private _handleOpen(item: Contents.IModel): void {
     this._onItemOpened.emit(item);
     if (item.type === 'directory') {
+      const localPath = this._manager.services.contents.localPath(item.path);
       this._model
-        .cd(`/${item.path}`)
+        .cd(`/${localPath}`)
         .catch(error => showErrorMessage('Open directory', error));
     } else {
       let path = item.path;
@@ -1150,15 +1160,18 @@ export class DirListing extends Widget {
     let selectedNames = Object.keys(this._selection);
     let source = this._items[index];
     let items = this._sortedItems;
+    let selectedItems: Contents.IModel[];
     let item: Contents.IModel | undefined;
 
     // If the source node is not selected, use just that node.
     if (!source.classList.contains(SELECTED_CLASS)) {
       item = items[index];
       selectedNames = [item.name];
+      selectedItems = [item];
     } else {
       let name = selectedNames[0];
       item = find(items, value => value.name === name);
+      selectedItems = toArray(this.selectedItems());
     }
 
     if (!item) {
@@ -1181,12 +1194,28 @@ export class DirListing extends Widget {
       proposedAction: 'move'
     });
     let basePath = this._model.path;
+
     let paths = toArray(
       map(selectedNames, name => {
         return PathExt.join(basePath, name);
       })
     );
     this._drag.mimeData.setData(CONTENTS_MIME, paths);
+
+    // Add thunks for getting mime data content.
+    // We thunk the content so we don't try to make a network call
+    // when it's not needed. E.g. just moving files around
+    // in a filebrowser
+    let services = this.model.manager.services;
+    for (const item of selectedItems) {
+      this._drag.mimeData.setData(CONTENTS_MIME_RICH, {
+        model: item,
+        withContent: async () => {
+          return await services.contents.get(item.path);
+        }
+      } as DirListing.IContentsThunk);
+    }
+
     if (item && item.type !== 'directory') {
       const otherPaths = paths.slice(1).reverse();
       this._drag.mimeData.setData(FACTORY_MIME, () => {
@@ -1558,6 +1587,25 @@ export namespace DirListing {
   }
 
   /**
+   * A file contents model thunk.
+   *
+   * Note: The content of the model will be empty.
+   * To get the contents, call and await the `withContent`
+   * method.
+   */
+  export interface IContentsThunk {
+    /**
+     * The contents model.
+     */
+    model: Contents.IModel;
+
+    /**
+     * Fetches the model with contents.
+     */
+    withContent: () => Promise<Contents.IModel>;
+  }
+
+  /**
    * The render interface for file browser listing options.
    */
   export interface IRenderer {
@@ -1637,6 +1685,10 @@ export namespace DirListing {
    * The default implementation of an `IRenderer`.
    */
   export class Renderer implements IRenderer {
+    constructor(icoReg: IIconRegistry) {
+      this._iconRegistry = icoReg;
+    }
+
     /**
      * Create the DOM node for a dir listing.
      */
@@ -1756,14 +1808,59 @@ export namespace DirListing {
       let modified = DOMUtils.findElement(node, ITEM_MODIFIED_CLASS);
 
       if (fileType) {
-        icon.textContent = fileType.iconLabel || '';
-        icon.className = `${ITEM_ICON_CLASS} ${fileType.iconClass || ''}`;
+        // TODO: remove workaround if...else/code in else clause in v2.0.0
+        // workaround for 1.0.x versions of Jlab pulling in 1.1.x versions of filebrowser
+        if (this._iconRegistry) {
+          // add icon as svg node. Can be styled using CSS
+          this._iconRegistry.icon({
+            name: fileType.iconClass,
+            className: ITEM_ICON_CLASS,
+            title: fileType.iconLabel,
+            fallback: true,
+            container: icon,
+            center: true,
+            kind: 'listing'
+          });
+        } else {
+          // add icon as CSS background image. Can't be styled using CSS
+          icon.className = `${ITEM_ICON_CLASS} ${fileType.iconClass || ''}`;
+          icon.textContent = fileType.iconLabel || '';
+        }
       } else {
-        icon.textContent = '';
+        // use default icon as CSS background image
         icon.className = ITEM_ICON_CLASS;
+        icon.textContent = '';
+        // clean up the svg icon annotation, if any
+        delete icon.dataset.icon;
       }
 
-      node.title = model.name;
+      let hoverText = 'Name: ' + model.name;
+      // add file size to pop up if its available
+      if (model.size !== null && model.size !== undefined) {
+        hoverText += '\nSize: ' + Private.formatFileSize(model.size, 1, 1024);
+      }
+      if (model.path) {
+        let dirname = PathExt.dirname(model.path);
+        if (dirname) {
+          hoverText += '\nPath: ' + dirname.substr(0, 50);
+          if (dirname.length > 50) {
+            hoverText += '...';
+          }
+        }
+      }
+      if (model.created) {
+        hoverText +=
+          '\nCreated: ' +
+          Time.format(new Date(model.created), 'YYYY-MM-DD HH:mm:ss');
+      }
+      if (model.last_modified) {
+        hoverText +=
+          '\nModified: ' +
+          Time.format(new Date(model.last_modified), 'YYYY-MM-DD HH:mm:ss');
+      }
+
+      node.title = hoverText;
+
       // If an item is being edited currently, its text node is unavailable.
       if (text && text.textContent !== model.name) {
         text.textContent = model.name;
@@ -1842,12 +1939,8 @@ export namespace DirListing {
       node.appendChild(icon);
       return node;
     }
+    _iconRegistry: IIconRegistry;
   }
-
-  /**
-   * The default `IRenderer` instance.
-   */
-  export const defaultRenderer = new Renderer();
 }
 
 /**
@@ -1955,5 +2048,27 @@ namespace Private {
     return ArrayExt.findFirstIndex(nodes, node =>
       ElementExt.hitTest(node, x, y)
     );
+  }
+
+  /**
+   * Format bytes to human readable string.
+   */
+  export function formatFileSize(
+    bytes: number,
+    decimalPoint: number,
+    k: number
+  ): string {
+    // https://www.codexworld.com/how-to/convert-file-size-bytes-kb-mb-gb-javascript/
+    if (bytes === 0) {
+      return '0 Bytes';
+    }
+    const dm = decimalPoint || 2;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    if (i >= 0 && i < sizes.length) {
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    } else {
+      return String(bytes);
+    }
   }
 }

@@ -104,11 +104,16 @@ input::placeholder {
   color: var(--jp-ui-font-color0);
 }
 
-/* Use our own theme for hover styles */
-.jp-HTMLSelect.bp3-html-select.bp3-minimal select:hover {
+/* Use our own theme for hover and option styles */
+.jp-HTMLSelect.bp3-html-select.bp3-minimal select:hover,
+.jp-HTMLSelect.bp3-html-select.bp3-minimal select > option {
   color: var(--jp-ui-font-color0);
   background-color: var(--jp-layout-color2);
 }
 select {
   box-sizing: border-box;
 }
+
+/* Sibling imports */
+@import './deprecated.css';
+@import './deprecatedExtra.css';

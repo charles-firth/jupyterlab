@@ -124,6 +124,12 @@
       "path": "../launcher-extension"
     },
     {
+      "path": "../logconsole"
+    },
+    {
+      "path": "../logconsole-extension"
+    },
+    {
       "path": "../mainmenu"
     },
     {
@@ -212,6 +218,9 @@
     },
     {
       "path": "../ui-components"
+    },
+    {
+      "path": "../ui-components-extension"
     },
     {
       "path": "../vdom"

@@ -3,13 +3,112 @@
 JupyterLab Changelog
 ====================
 
-v1.0.0
-------
+`v1.2.0 <https://github.com/jupyterlab/jupyterlab/releases/tag/v1.2.0>`__
+---------------------------------------------------------------------------
 
+October 29, 2019
+^^^^^^^^^^^^^^^^
 
-See the `JupyterLab
-1.0.0 <https://github.com/jupyterlab/jupyterlab/milestone/2?closed=1>`__
+Here are some highlights for this release. See the `JupyterLab
+1.2.0 <https://github.com/jupyterlab/jupyterlab/milestone/38?closed=1>`__
 milestone on GitHub for the full list of pull requests and issues closed.
+
+User-facing changes
+^^^^^^^^^^^^^^^^^^^
+
+* Select cells from the current cell to the top of the notebook with ``Shift Home``, to the bottom of the notebook with ``Shift End`` (`#7336 <https://github.com/jupyterlab/jupyterlab/pull/7336>`__, `#6783 <https://github.com/jupyterlab/jupyterlab/pull/6783>`__)
+* Add a log console extension to display unhandled messages and other activity (`#7318 <https://github.com/jupyterlab/jupyterlab/pull/7318>`__, `#7319 <https://github.com/jupyterlab/jupyterlab/pull/7319>`__,  `#7379 <https://github.com/jupyterlab/jupyterlab/pull/7379>`__, `#7399 <https://github.com/jupyterlab/jupyterlab/pull/7399>`__,  `#7406 <https://github.com/jupyterlab/jupyterlab/pull/7406>`__, `#7421 <https://github.com/jupyterlab/jupyterlab/pull/7421>`__)
+* Allow the npm ``max-old-space`` option to be specified outside of JupyterLab (`#7317 <https://github.com/jupyterlab/jupyterlab/pull/7317>`__)
+* Only display node structure in a JSON tree view for arrays and empty objects (`#7261 <https://github.com/jupyterlab/jupyterlab/pull/7261>`__)
+* Make much smaller distribution packages by not building JavaScript source maps for releases. (`#7150 <https://github.com/jupyterlab/jupyterlab/pull/7150>`__)
+* Add support for pasting cell attachments and dragging attachments from the file browser (`#5913 <https://github.com/jupyterlab/jupyterlab/pull/5913>`__, `#5744 <https://github.com/jupyterlab/jupyterlab/issues/5744>`__)
+* Add a new ``registry`` configuration parameter to override the default yarn repository when building (`#7363 <https://github.com/jupyterlab/jupyterlab/pull/7363>`__, `#7109 <https://github.com/jupyterlab/jupyterlab/pull/7109>`__)
+
+
+For developers
+^^^^^^^^^^^^^^
+
+* Update the Markdown renderer (``marked``) to 0.7.0 (`#7328 <https://github.com/jupyterlab/jupyterlab/pull/7328>`__)
+* Remove datagrid as a singleton, allowing extensions to use newer versions (`#7312 <https://github.com/jupyterlab/jupyterlab/pull/7312>`__)
+* Add metadata to the kernelspec information (`#7234 <https://github.com/jupyterlab/jupyterlab/pull/7234>`__)
+* Allow different mimetypes for the clipboard data (`#7233 <https://github.com/jupyterlab/jupyterlab/pull/7233>`__)
+* Add inline svg icon support to toolbar buttons (`#7232 <https://github.com/jupyterlab/jupyterlab/pull/7232>`__)
+* Add PageConfig functions to query if a plugin is deferred or disabled (`#7216 <https://github.com/jupyterlab/jupyterlab/pull/7216>`__)
+* Allow for renderers for nbformat.ierror to be created (`#7203 <https://github.com/jupyterlab/jupyterlab/pull/7203>`__, `#7193 <https://github.com/jupyterlab/jupyterlab/issues/7193>`__)
+* Refactor ``fileeditor-extension`` for modularization (`#6904 <https://github.com/jupyterlab/jupyterlab/pull/6904>`__)
+* Add execution timing to cells (`#6864 <https://github.com/jupyterlab/jupyterlab/pull/6864>`__, `#3320 <https://github.com/jupyterlab/jupyterlab/issues/3320>`__)
+
+Bugfixes
+^^^^^^^^
+* Fix the ``file-browser-path`` query parameter (`#7313 <https://github.com/jupyterlab/jupyterlab/pull/7313>`__)
+* Skip custom click behavior on links when the download attribute is set (`#7323 <https://github.com/jupyterlab/jupyterlab/pull/7323>`__)
+* Fix opening multiple browser tabs in Safari (`#7322 <https://github.com/jupyterlab/jupyterlab/pull/7322>`__)
+* Fix context menus on SVG icons (`#7263 <https://github.com/jupyterlab/jupyterlab/pull/7263>`__)
+* Fix overwriting of target attribute of anchors rendered by ``IPython.display`` (`#7231 <https://github.com/jupyterlab/jupyterlab/pull/7231>`__)
+* Fix multi-cursor backspacing (`#7205 <https://github.com/jupyterlab/jupyterlab/pull/7205>`__,  `#7401 <https://github.com/jupyterlab/jupyterlab/pull/7401>`__,  `#7413 <https://github.com/jupyterlab/jupyterlab/pull/7413>`__)
+* Fix mult-cursor cell splitting (`#7207 <https://github.com/jupyterlab/jupyterlab/pull/7207>`__, `#7417 <https://github.com/jupyterlab/jupyterlab/pull/7417>`__, `#7419 <https://github.com/jupyterlab/jupyterlab/pull/7419>`__)
+
+
+`v1.1.0 <https://github.com/jupyterlab/jupyterlab/releases/tag/v1.1.0>`__
+---------------------------------------------------------------------------
+
+August 28, 2019
+^^^^^^^^^^^^^^^
+
+Here are some highlights of what is in this release. See the `JupyterLab
+1.1.0 <https://github.com/jupyterlab/jupyterlab/milestone/31?closed=1>`__
+milestone on GitHub for the full list of pull requests and issues closed.
+
+
+User-facing changes
+^^^^^^^^^^^^^^^^^^^
+
+* ``jupyter lab build`` now has a ``--minimize=False`` option to build without minimization to conserve memory and time (`#6907 <https://github.com/jupyterlab/jupyterlab/pull/6907>`__)
+* Fix workspace reset functionality (`#7106 <https://github.com/jupyterlab/jupyterlab/pull/7106>`__, `#7105 <https://github.com/jupyterlab/jupyterlab/issues/7105>`__)
+* Restore behavior of the "raises-exception" cell tag (`#7020 <https://github.com/jupyterlab/jupyterlab/pull/7020>`__, `#7015 <https://github.com/jupyterlab/jupyterlab/issues/7015>`__)
+* Add settings to override theme font sizes (`#6926 <https://github.com/jupyterlab/jupyterlab/pull/6926>`__)
+* Accept query parameter to optionally change file browser location (`#6875 <https://github.com/jupyterlab/jupyterlab/pull/6875>`__)
+* Pressing escape in the console should switch out of edit mode (`#6822 <https://github.com/jupyterlab/jupyterlab/pull/6822>`__)
+* Fix file browser downloads in Google Chrome (`#6686 <https://github.com/jupyterlab/jupyterlab/pull/6686>`__)
+* Make it possible to override the default widgets to view a file (`#6813 <https://github.com/jupyterlab/jupyterlab/pull/6813>`__, `#4048 <https://github.com/jupyterlab/jupyterlab/issues/4048>`__)
+* Support installing multiple versions of the same extension (`#6857 <https://github.com/jupyterlab/jupyterlab/pull/6857>`__)
+* Support JupyterHub server name for JupyterHub 1.0 (`#6931 <https://github.com/jupyterlab/jupyterlab/pull/6931>`__)
+* Add docs to help users diagnose issues before creating them (`#6971 <https://github.com/jupyterlab/jupyterlab/pull/6971>`__)
+* The JupyterLab conda-forge package is now a `noarch` package. If you are using JupyterLab with `notebook` version 5.2 or earlier, you may need to manually enable the JupyterLab server extension. See the issue for more details (`#7042 <https://github.com/jupyterlab/jupyterlab/issues/7042>`__)
+
+For developers
+^^^^^^^^^^^^^^
+
+* Expose install_kernel for tests so that outside projects can better use the testing framework (`#7089 <https://github.com/jupyterlab/jupyterlab/pull/7089>`__)
+* Fix ``comm_info_request`` content to conform to the Jupyter message specification in a backwards-compatible way (`#6949 <https://github.com/jupyterlab/jupyterlab/pull/6949>`__, `#6947 <https://github.com/jupyterlab/jupyterlab/issues/6947>`__)
+* Add yarn package resolution to build to constrain core package versions to patch semver ranges (`#6938 <https://github.com/jupyterlab/jupyterlab/pull/6938>`__)
+* Make handling comm messages optional in a kernel connection. (`#6929 <https://github.com/jupyterlab/jupyterlab/pull/6929>`__)
+* Expose icon svg to theme css (`#6034 <https://github.com/jupyterlab/jupyterlab/pull/6034>`__, `#7027 <https://github.com/jupyterlab/jupyterlab/pull/7027>`__)
+* Expose convenience functions for open dialogs (`#6366 <https://github.com/jupyterlab/jupyterlab/pull/6366>`__, `#6365 <https://github.com/jupyterlab/jupyterlab/issues/6365>`__)
+* Add debug messages to possible kernel messages (`#6704 <https://github.com/jupyterlab/jupyterlab/pull/6704>`__)
+* Add server side coreconfig object (`#6991 <https://github.com/jupyterlab/jupyterlab/pull/6991>`__)
+
+Bug fixes
+^^^^^^^^^
+
+* Handle errors that occur during kernel selection (`#7094 <https://github.com/jupyterlab/jupyterlab/pull/7094>`__)
+* Fix escaping issues for page config and other template variables (`#7016 <https://github.com/jupyterlab/jupyterlab/pull/7016>`__, `#7024 <https://github.com/jupyterlab/jupyterlab/issues/7024>`__, `#7061 <https://github.com/jupyterlab/jupyterlab/pull/7061>`__, `#7058 <https://github.com/jupyterlab/jupyterlab/issues/7058>`__, `#6858 <https://github.com/jupyterlab/jupyterlab/issues/6858>`__)
+* Require jinja2 2.10+ to fix escaping issues (`#7055 <https://github.com/jupyterlab/jupyterlab/pull/7055>`__, `#7053 <https://github.com/jupyterlab/jupyterlab/issues/7053>`__)
+* Increase the search debounce from 100ms to 500ms to increase incremental search responsiveness in large documents (`#7034 <https://github.com/jupyterlab/jupyterlab/pull/7034>`__)
+* Fix vega downloads and download urls in general (`#7022 <https://github.com/jupyterlab/jupyterlab/pull/7022>`__, `#7017 <https://github.com/jupyterlab/jupyterlab/issues/7017>`__, `#7098 <https://github.com/jupyterlab/jupyterlab/pull/7098>`__, `#7047 <https://github.com/jupyterlab/jupyterlab/issues/7047>`__)
+* Do not complain in the build about duplicate or optional packages (`#7013 <https://github.com/jupyterlab/jupyterlab/pull/7013>`__)
+* Fix contextual help layout for R help (`#6933 <https://github.com/jupyterlab/jupyterlab/pull/6933>`__, `#6935 <https://github.com/jupyterlab/jupyterlab/pull/6935>`__)
+
+
+
+`v1.0.0 <https://github.com/jupyterlab/jupyterlab/releases/tag/v1.0.0>`__
+---------------------------------------------------------------------------
+
+June 28, 2019
+^^^^^^^^^^^^^^^
+
+See the `JupyterLab 1.0.0 <https://github.com/jupyterlab/jupyterlab/milestone/2?closed=1>`__
+milestone on GitHub for the full list of pull requests and issues closed in 1.0.0, and other 1.0.x milestones for bugs fixed in patch releases.
 
 
 Find and Replace

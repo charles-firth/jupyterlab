@@ -44,10 +44,18 @@ a keyboard shortcut or automatically on save.
 ## Submitting a Pull Request Contribution
 
 Generally, an issue should be opened describing a piece of proposed work and the
-issues it solves before a pull request is opened. This lets community members
-participate in the design discussion, makes others aware of work being done, and
-sets the stage for a fruitful community interaction. A pull request should
-reference the issue it is addressing.
+issues it solves before a pull request is opened.
+
+### Issue Management
+
+Opening an issue lets community members participate in the design discussion,
+makes others aware of work being done, and sets the stage for a fruitful community
+interaction. A pull request should reference the issue it is addressing. Once the
+pull request is merged, the issue related to it will also be closed. If there is
+additional discussion around implemementation the issue may be re-opened. Once 30 days
+have passed with no additional discussion, the [lock bot](https://github.com/apps/lock) will lock the issue. If
+additional discussion is desired, or if the pull request doesn't fully address the
+locked issue, please open a new issue referencing the locked issue.
 
 ### Tag Issues with Labels
 
@@ -61,7 +69,7 @@ You can launch a binder with the latest JupyterLab master to test something (thi
 
 ### Installing Node.js and jlpm
 
-Building JupyterLab from its GitHub source code requires Node.js.
+Building JupyterLab from its GitHub source code requires Node.js. The development version requires Node.js version 12+.
 
 If you use `conda`, you can get it with:
 
@@ -76,6 +84,12 @@ brew install node
 ```
 
 You can also use the installer from the [Node.js](https://nodejs.org) website.
+
+To check which version of Node.js is installed:
+
+```bash
+node -v
+```
 
 ## Installing JupyterLab
 
@@ -487,7 +501,7 @@ Alternatively, you can install the documentation dependencies in an existing env
 conda env update -n <ENVIRONMENT> -f docs/environment.yml
 ```
 
-The Developer Documentation includes a [guide](http://jupyterlab.readthedocs.io/en/latest/developer/documentation.html) to writing documentation including writing style, naming conventions, keyboard shortcuts, and screenshots.
+The Developer Documentation includes a [guide](https://jupyterlab.readthedocs.io/en/latest/developer/contributing.html) to writing documentation including writing style, naming conventions, keyboard shortcuts, and screenshots.
 
 To test the docs run:
 

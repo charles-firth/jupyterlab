@@ -88,13 +88,13 @@ export class NotebookActions {
  */
 export namespace NotebookActions {
   /**
-   * Split the active cell into two cells.
+   * Split the active cell into two or more cells.
    *
    * @param widget - The target notebook widget.
    *
    * #### Notes
    * It will preserve the existing mode.
-   * The second cell will be activated.
+   * The last cell will be activated.
    * The existing selection will be cleared.
    * The leading whitespace in the second cell will be removed.
    * If there is no content, two empty cells will be created.
@@ -114,35 +114,58 @@ export namespace NotebookActions {
     const index = notebook.activeCellIndex;
     const child = notebook.widgets[index];
     const editor = child.editor;
-    const position = editor.getCursorPosition();
-    const offset = editor.getOffsetAt(position);
+    const selections = editor.getSelections();
     const orig = child.model.value.text;
 
-    // Create new models to preserve history.
-    const clone0 = Private.cloneCell(nbModel, child.model);
-    const clone1 = Private.cloneCell(nbModel, child.model);
+    let offsets = [0];
 
-    if (clone0.type === 'code') {
-      (clone0 as ICodeCellModel).outputs.clear();
+    for (let i = 0; i < selections.length; i++) {
+      // append start and end to handle selections
+      // cursors will have same start and end
+      let start = editor.getOffsetAt(selections[i].start);
+      let end = editor.getOffsetAt(selections[i].end);
+      if (start < end) {
+        offsets.push(start);
+        offsets.push(end);
+      } else if (end < start) {
+        offsets.push(end);
+        offsets.push(start);
+      } else {
+        offsets.push(start);
+      }
     }
-    clone0.value.text = orig
-      .slice(0, offset)
-      .replace(/^\n+/, '')
-      .replace(/\n+$/, '');
-    clone1.value.text = orig
-      .slice(offset)
-      .replace(/^\n+/, '')
-      .replace(/\n+$/, '');
 
-    // Make the changes while preserving history.
+    offsets.push(orig.length);
+
+    let clones: ICellModel[] = [];
+    for (let i = 0; i + 1 < offsets.length; i++) {
+      let clone = Private.cloneCell(nbModel, child.model);
+      clones.push(clone);
+    }
+
+    for (let i = 0; i < clones.length; i++) {
+      if (i !== clones.length - 1 && clones[i].type === 'code') {
+        (clones[i] as ICodeCellModel).outputs.clear();
+      }
+      clones[i].value.text = orig
+        .slice(offsets[i], offsets[i + 1])
+        .replace(/^\n+/, '')
+        .replace(/\n+$/, '');
+    }
+
     const cells = nbModel.cells;
 
     cells.beginCompoundOperation();
-    cells.set(index, clone0);
-    cells.insert(index + 1, clone1);
+    for (let i = 0; i < clones.length; i++) {
+      if (i === 0) {
+        cells.set(index, clones[i]);
+      } else {
+        cells.insert(index + i, clones[i]);
+      }
+    }
     cells.endCompoundOperation();
 
-    notebook.activeCellIndex++;
+    notebook.activeCellIndex = index + clones.length - 1;
     Private.handleState(notebook, state);
   }
 
@@ -719,12 +742,16 @@ export namespace NotebookActions {
    * Extend the selection to the cell above.
    *
    * @param notebook - The target notebook widget.
+   * @param toTop - If true, denotes selection to extend to the top.
    *
    * #### Notes
    * This is a no-op if the first cell is the active cell.
    * The new cell will be activated.
    */
-  export function extendSelectionAbove(notebook: Notebook): void {
+  export function extendSelectionAbove(
+    notebook: Notebook,
+    toTop: boolean = false
+  ): void {
     if (!notebook.model || !notebook.activeCell) {
       return;
     }
@@ -736,7 +763,12 @@ export namespace NotebookActions {
     const state = Private.getState(notebook);
 
     notebook.mode = 'command';
-    notebook.extendContiguousSelectionTo(notebook.activeCellIndex - 1);
+    // Check if toTop is true, if yes, selection is made to the top.
+    if (toTop) {
+      notebook.extendContiguousSelectionTo(0);
+    } else {
+      notebook.extendContiguousSelectionTo(notebook.activeCellIndex - 1);
+    }
     Private.handleState(notebook, state, true);
   }
 
@@ -744,12 +776,16 @@ export namespace NotebookActions {
    * Extend the selection to the cell below.
    *
    * @param notebook - The target notebook widget.
+   * @param toBottom - If true, denotes selection to extend to the bottom.
    *
    * #### Notes
    * This is a no-op if the last cell is the active cell.
    * The new cell will be activated.
    */
-  export function extendSelectionBelow(notebook: Notebook): void {
+  export function extendSelectionBelow(
+    notebook: Notebook,
+    toBottom: boolean = false
+  ): void {
     if (!notebook.model || !notebook.activeCell) {
       return;
     }
@@ -761,7 +797,12 @@ export namespace NotebookActions {
     const state = Private.getState(notebook);
 
     notebook.mode = 'command';
-    notebook.extendContiguousSelectionTo(notebook.activeCellIndex + 1);
+    // Check if toBottom is true, if yes selection is made to the bottom.
+    if (toBottom) {
+      notebook.extendContiguousSelectionTo(notebook.widgets.length - 1);
+    } else {
+      notebook.extendContiguousSelectionTo(notebook.activeCellIndex + 1);
+    }
     Private.handleState(notebook, state, true);
   }
 
@@ -978,6 +1019,19 @@ export namespace NotebookActions {
 
     notebook.editorConfig = newConfig;
     Private.handleState(notebook, state);
+  }
+
+  /**
+   * Toggle whether to record cell timing execution.
+   *
+   * @param notebook - The target notebook widget.
+   */
+  export function toggleRecordTiming(notebook: Notebook): void {
+    if (!notebook.model) {
+      return;
+    }
+    const currentValue = notebook.model.metadata.get('record_timing') || false;
+    notebook.model.metadata.set('record_timing', !currentValue);
   }
 
   /**
@@ -1472,7 +1526,8 @@ namespace Private {
       case 'code':
         if (session) {
           return CodeCell.execute(cell as CodeCell, session, {
-            deletedCells: notebook.model.deletedCells
+            deletedCells: notebook.model.deletedCells,
+            recordTiming: notebook.model.metadata.get('record_timing') || false
           })
             .then(reply => {
               notebook.model.deletedCells.splice(

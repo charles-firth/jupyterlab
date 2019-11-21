@@ -14,15 +14,16 @@ from jupyter_core.application import JupyterApp, base_aliases
 from jupyterlab_server import slugify, WORKSPACE_EXTENSION
 from notebook.notebookapp import NotebookApp, aliases, flags
 from notebook.utils import url_path_join as ujoin
-from traitlets import Bool, Unicode
+from traitlets import Bool, Instance, Unicode
 
 from ._version import __version__
 from .debuglog import DebugLogFileMixin
 from .extension import load_config, load_jupyter_server_extension
 from .commands import (
     build, clean, get_app_dir, get_app_version, get_user_settings_dir,
-    get_workspaces_dir
+    get_workspaces_dir, AppOptions,
 )
+from .coreconfig import CoreConfig
 
 
 build_aliases = dict(base_aliases)
@@ -30,6 +31,7 @@ build_aliases['app-dir'] = 'LabBuildApp.app_dir'
 build_aliases['name'] = 'LabBuildApp.name'
 build_aliases['version'] = 'LabBuildApp.version'
 build_aliases['dev-build'] = 'LabBuildApp.dev_build'
+build_aliases['minimize'] = 'LabBuildApp.minimize'
 build_aliases['debug-log-path'] = 'DebugLogFileMixin.debug_log_path'
 
 build_flags = dict(flags)
@@ -52,6 +54,9 @@ class LabBuildApp(JupyterApp, DebugLogFileMixin):
     aliases = build_aliases
     flags = build_flags
 
+    # Not configurable!
+    core_config = Instance(CoreConfig, allow_none=True)
+
     app_dir = Unicode('', config=True,
         help="The app directory to build in")
 
@@ -61,23 +66,36 @@ class LabBuildApp(JupyterApp, DebugLogFileMixin):
     version = Unicode('', config=True,
         help="The version of the built application")
 
-    dev_build = Bool(True, config=True,
-        help="Whether to build in dev mode (defaults to dev mode)")
+    dev_build = Bool(None, allow_none=True, config=True,
+        help="Whether to build in dev mode. Defaults to True (dev mode) if there are any locally linked extensions, else defaults to False (prod mode).")
+
+    minimize = Bool(True, config=True,
+        help="Whether to use a minifier during the Webpack build (defaults to True). Only affects production builds.")
 
     pre_clean = Bool(False, config=True,
         help="Whether to clean before building (defaults to False)")
 
     def start(self):
-        command = 'build:prod' if not self.dev_build else 'build'
+        parts = ['build']
+        parts.append('none' if self.dev_build is None else
+                     'dev' if self.dev_build else
+                     'prod')
+        if self.minimize:
+            parts.append('minimize')
+        command = ':'.join(parts)
+
         app_dir = self.app_dir or get_app_dir()
+        app_options = AppOptions(
+            app_dir=app_dir, logger=self.log, core_config=self.core_config
+        )
         self.log.info('JupyterLab %s', version)
         with self.debug_logging():
             if self.pre_clean:
                 self.log.info('Cleaning %s' % app_dir)
-                clean(self.app_dir)
+                clean(app_options=app_options)
             self.log.info('Building in %s', app_dir)
-            build(app_dir=app_dir, name=self.name, version=self.version,
-                command=command, logger=self.log)
+            build(name=self.name, version=self.version,
+                  command=command, app_options=app_options)
 
 
 clean_aliases = dict(base_aliases)
@@ -94,10 +112,15 @@ class LabCleanApp(JupyterApp):
     """
     aliases = clean_aliases
 
+    # Not configurable!
+    core_config = Instance(CoreConfig, allow_none=True)
+
     app_dir = Unicode('', config=True, help='The app directory to clean')
 
     def start(self):
-        clean(self.app_dir, logger=self.log)
+        clean(app_options=AppOptions(
+            app_dir=self.app_dir, logger=self.log,
+            core_config=self.core_config))
 
 
 class LabPathApp(JupyterApp):
@@ -400,7 +423,7 @@ class LabApp(NotebookApp):
         super(LabApp, self).init_server_extensions()
         msg = 'JupyterLab server extension not enabled, manually loading...'
         if not self.nbserver_extensions.get('jupyterlab', False):
-            self.log.warn(msg)
+            self.log.warning(msg)
             load_jupyter_server_extension(self)
 
 

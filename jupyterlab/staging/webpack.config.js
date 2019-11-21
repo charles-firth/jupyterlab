@@ -9,7 +9,8 @@ var Handlebars = require('handlebars');
 var HtmlWebpackPlugin = require('html-webpack-plugin');
 var webpack = require('webpack');
 var DuplicatePackageCheckerPlugin = require('duplicate-package-checker-webpack-plugin');
-var Visualizer = require('webpack-visualizer-plugin');
+var BundleAnalyzerPlugin = require('webpack-bundle-analyzer')
+  .BundleAnalyzerPlugin;
 
 var Build = require('@jupyterlab/buildutils').Build;
 var WPPlugin = require('@jupyterlab/buildutils').WPPlugin;
@@ -58,6 +59,12 @@ Object.keys(jlab.linkedPackages).forEach(function(name) {
   const localPkgPath = require.resolve(plib.join(name, 'package.json'));
   watched[name] = plib.dirname(localPkgPath);
 });
+
+// Set up source-map-loader to look in watched lib dirs
+let sourceMapRes = Object.values(watched).reduce((res, name) => {
+  res.push(new RegExp(name + '/lib'));
+  return res;
+}, []);
 
 /**
  * Sync a local path to a linked package path if they are files and differ.
@@ -138,7 +145,7 @@ const plugins = [
 ];
 
 if (process.argv.includes('--analyze')) {
-  plugins.push(new Visualizer());
+  plugins.push(new BundleAnalyzerPlugin());
 }
 
 module.exports = [
@@ -164,10 +171,9 @@ module.exports = [
         { test: /\.txt$/, use: 'raw-loader' },
         {
           test: /\.js$/,
+          include: sourceMapRes,
           use: ['source-map-loader'],
-          enforce: 'pre',
-          // eslint-disable-next-line no-undef
-          exclude: /node_modules/
+          enforce: 'pre'
         },
         { test: /\.(jpg|png|gif)$/, use: 'file-loader' },
         { test: /\.js.map$/, use: 'file-loader' },
@@ -189,8 +195,22 @@ module.exports = [
         },
         { test: /\.eot(\?v=\d+\.\d+\.\d+)?$/, use: 'file-loader' },
         {
+          // in css files, svg is loaded as a url formatted string
           test: /\.svg(\?v=\d+\.\d+\.\d+)?$/,
-          use: 'url-loader?limit=10000&mimetype=image/svg+xml'
+          issuer: { test: /\.css$/ },
+          use: {
+            loader: 'svg-url-loader',
+            options: { encoding: 'none', limit: 10000 }
+          }
+        },
+        {
+          // in ts and tsx files (both of which compile to js),
+          // svg is loaded as a raw string
+          test: /\.svg(\?v=\d+\.\d+\.\d+)?$/,
+          issuer: { test: /\.js$/ },
+          use: {
+            loader: 'raw-loader'
+          }
         }
       ]
     },

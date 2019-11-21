@@ -129,13 +129,13 @@ JupyterLab's current maintainers are listed in alphabetical order, with affiliat
   prolific contributions throughout the code base).
 - Jessica Forde, Project Jupyter (demo, documentation)
 - Tim George, Cal Poly (UI/UX design, strategy, management, user needs analysis)
-- Brian Granger, Cal Poly (co-creator, strategy, vision, management, UI/UX design,
+- Brian Granger, AWS (co-creator, strategy, vision, management, UI/UX design,
   architecture).
 - Jason Grout, Bloomberg (co-creator, vision, general development).
 - Fernando Perez, UC Berkeley (co-creator, vision).
 - Ian Rose, Quansight/City of LA (general core development, extensions).
 - Saul Shanabrook, Quansight (general development, extensions)
-- Steven Silvester, JPMorgan Chase (co-creator, release management, packaging,
+- Steven Silvester, AWS (co-creator, release management, packaging,
   prolific contributions throughout the code base).
 - Vidar T. Fauske, JPMorgan Chase (general development, extensions).
 
@@ -152,7 +152,7 @@ To be listed, please submit a pull request with your information.
 
 We encourage you to ask questions on the [Discourse forum](https://discourse.jupyter.org/c/jupyterlab). A question answered there can become a useful resource for others.
 
-Please use the [GitHub issues page](https://github.com/jupyterlab/jupyterlab/issues) to provide feedback or submit a bug report.
+Please use the [GitHub issues page](https://github.com/jupyterlab/jupyterlab/issues) to provide feedback or submit a bug report. To keep resolved issues self-contained, the [lock bot](https://github.com/apps/lock) will lock closed issues as resolved after a period of inactivity. If related discussion is still needed after an issue is locked, please open a new issue and reference the old issue.
 
 ### Weekly Dev Meeting
 
@@ -162,4 +162,4 @@ Anyone is welcome to attend, if they would like to discuss a topic or just to li
 
 - When: Wednesdays [9AM Pacific Time](https://www.thetimezoneconverter.com/?t=9%3A00%20am&tz=San%20Francisco&)
 - Where: [`calpoly/jupyter` Zoom](https://calpoly.zoom.us/my/jupyter)
-- What: [Meeting notes on Dropbox Paper](https://paper.dropbox.com/doc/JLab-Dev-Meeting-Minutes-2019--AZlv6L3jnv8ntl6kJK88y5M5Ag-Lj0P4kI2JrbA0eXHZSdY5)
+- What: [Meeting notes](https://hackmd.io/Uscrk0N1RhCtX-p6ZHUuWQ?both)
