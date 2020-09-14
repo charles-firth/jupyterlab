@@ -4,9 +4,9 @@
 import { ISearchProvider, ISearchProviderConstructor } from './interfaces';
 import { ISearchProviderRegistry } from './tokens';
 
-import { IDisposable, DisposableDelegate } from '@phosphor/disposable';
-import { ISignal, Signal } from '@phosphor/signaling';
-import { Widget } from '@phosphor/widgets';
+import { IDisposable, DisposableDelegate } from '@lumino/disposable';
+import { ISignal, Signal } from '@lumino/signaling';
+import { Widget } from '@lumino/widgets';
 
 export class SearchProviderRegistry implements ISearchProviderRegistry {
   /**
@@ -53,7 +53,7 @@ export class SearchProviderRegistry implements ISearchProviderRegistry {
   ): ISearchProvider<T> | undefined {
     // iterate through all providers and ask each one if it can search on the
     // widget.
-    for (let P of providerMap.values()) {
+    for (const P of providerMap.values()) {
       if (P.canSearchOn(widget)) {
         return new P();
       }

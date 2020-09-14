@@ -16,7 +16,7 @@ import {
   ReactWidget
 } from '@jupyterlab/apputils';
 
-import { ISettingRegistry, IChangedArgs } from '@jupyterlab/coreutils';
+import { IChangedArgs } from '@jupyterlab/coreutils';
 
 import {
   ILoggerRegistry,
@@ -31,17 +31,28 @@ import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
 
 import { IRenderMimeRegistry } from '@jupyterlab/rendermime';
 
+import { ISettingRegistry } from '@jupyterlab/settingregistry';
+
 import { IStatusBar } from '@jupyterlab/statusbar';
 
-import { HTMLSelect } from '@jupyterlab/ui-components';
+import {
+  nullTranslator,
+  ITranslator,
+  TranslationBundle
+} from '@jupyterlab/translation';
 
-import { UUID } from '@phosphor/coreutils';
+import {
+  addIcon,
+  clearIcon,
+  HTMLSelect,
+  listIcon
+} from '@jupyterlab/ui-components';
 
-import { DockLayout, Widget } from '@phosphor/widgets';
+import { UUID } from '@lumino/coreutils';
+
+import { DockLayout, Widget } from '@lumino/widgets';
 
 import * as React from 'react';
-
-import { logNotebookOutput } from './nboutput';
 
 import { LogConsoleStatus } from './status';
 
@@ -64,7 +75,7 @@ const logConsolePlugin: JupyterFrontEndPlugin<ILoggerRegistry> = {
   activate: activateLogConsole,
   id: LOG_CONSOLE_PLUGIN_ID,
   provides: ILoggerRegistry,
-  requires: [ILabShell, IRenderMimeRegistry, INotebookTracker],
+  requires: [ILabShell, IRenderMimeRegistry, INotebookTracker, ITranslator],
   optional: [
     ICommandPalette,
     ILayoutRestorer,
@@ -83,14 +94,16 @@ function activateLogConsole(
   labShell: ILabShell,
   rendermime: IRenderMimeRegistry,
   nbtracker: INotebookTracker,
+  translator: ITranslator,
   palette: ICommandPalette | null,
   restorer: ILayoutRestorer | null,
   mainMenu: IMainMenu | null,
   settingRegistry: ISettingRegistry | null,
   statusBar: IStatusBar | null
 ): ILoggerRegistry {
-  let logConsoleWidget: MainAreaWidget<LogConsolePanel> = null;
-  let logConsolePanel: LogConsolePanel = null;
+  const trans = translator.load('jupyterlab');
+  let logConsoleWidget: MainAreaWidget<LogConsolePanel> | null = null;
+  let logConsolePanel: LogConsolePanel | null = null;
 
   const loggerRegistry = new LoggerRegistry({
     defaultRendermime: rendermime,
@@ -115,12 +128,13 @@ function activateLogConsole(
       if (!logConsoleWidget) {
         createLogConsoleWidget({
           insertMode: 'split-bottom',
-          ref: app.shell.currentWidget.id
+          ref: app.shell.currentWidget?.id
         });
       } else {
         app.shell.activateById(logConsoleWidget.id);
       }
-    }
+    },
+    translator
   });
 
   interface ILogConsoleOptions {
@@ -130,7 +144,7 @@ function activateLogConsole(
   }
 
   const createLogConsoleWidget = (options: ILogConsoleOptions = {}) => {
-    logConsolePanel = new LogConsolePanel(loggerRegistry);
+    logConsolePanel = new LogConsolePanel(loggerRegistry, translator);
 
     logConsolePanel.source =
       options.source !== undefined
@@ -142,8 +156,8 @@ function activateLogConsole(
     logConsoleWidget = new MainAreaWidget({ content: logConsolePanel });
     logConsoleWidget.addClass('jp-LogConsole');
     logConsoleWidget.title.closable = true;
-    logConsoleWidget.title.label = 'Log Console';
-    logConsoleWidget.title.iconClass = 'jp-ListIcon';
+    logConsoleWidget.title.icon = listIcon;
+    logConsoleWidget.title.label = trans.__('Log Console');
 
     const addCheckpointButton = new CommandToolbarButton({
       commands: app.commands,
@@ -163,7 +177,7 @@ function activateLogConsole(
 
     logConsoleWidget.toolbar.addItem(
       'level',
-      new LogLevelSwitcher(logConsoleWidget.content)
+      new LogLevelSwitcher(logConsoleWidget.content, translator)
     );
 
     logConsolePanel.sourceChanged.connect(() => {
@@ -191,7 +205,7 @@ function activateLogConsole(
   };
 
   app.commands.addCommand(CommandIDs.open, {
-    label: 'Show Log Console',
+    label: trans.__('Show Log Console'),
     execute: (options: ILogConsoleOptions = {}) => {
       // Toggle the display
       if (logConsoleWidget) {
@@ -206,22 +220,21 @@ function activateLogConsole(
   });
 
   app.commands.addCommand(CommandIDs.addCheckpoint, {
-    label: 'Add Checkpoint',
     execute: () => {
-      logConsolePanel.logger.checkpoint();
+      logConsolePanel?.logger?.checkpoint();
     },
-    isEnabled: () => logConsolePanel && logConsolePanel.source !== null,
-    iconClass: 'jp-AddIcon'
+    icon: addIcon,
+    isEnabled: () => !!logConsolePanel && logConsolePanel.source !== null,
+    label: trans.__('Add Checkpoint')
   });
 
   app.commands.addCommand(CommandIDs.clear, {
-    label: 'Clear Log',
     execute: () => {
-      logConsolePanel.logger.clear();
+      logConsolePanel?.logger?.clear();
     },
-    isEnabled: () => logConsolePanel && logConsolePanel.source !== null,
-    // TODO: figure out how this jp-clearIcon class should work, analagous to jp-AddIcon
-    iconClass: 'fa fa-ban jp-ClearIcon'
+    icon: clearIcon,
+    isEnabled: () => !!logConsolePanel && logConsolePanel.source !== null,
+    label: trans.__('Clear Log')
   });
 
   function toTitleCase(value: string) {
@@ -229,12 +242,15 @@ function activateLogConsole(
   }
 
   app.commands.addCommand(CommandIDs.setLevel, {
-    label: args => `Set Log Level to ${toTitleCase(args.level as string)}`,
-    execute: (args: { level: LogLevel }) => {
-      logConsolePanel.logger.level = args.level;
-    },
-    isEnabled: () => logConsolePanel && logConsolePanel.source !== null
     // TODO: find good icon class
+    execute: (args: { level: LogLevel }) => {
+      if (logConsolePanel?.logger) {
+        logConsolePanel.logger.level = args.level;
+      }
+    },
+    isEnabled: () => !!logConsolePanel && logConsolePanel.source !== null,
+    label: args =>
+      trans.__('Set Log Level to %1', toTitleCase(args.level as string))
   });
 
   app.contextMenu.addItem({
@@ -245,7 +261,10 @@ function activateLogConsole(
     mainMenu.viewMenu.addGroup([{ command: CommandIDs.open }]);
   }
   if (palette) {
-    palette.addItem({ command: CommandIDs.open, category: 'Main Area' });
+    palette.addItem({
+      command: CommandIDs.open,
+      category: trans.__('Main Area')
+    });
   }
   if (statusBar) {
     statusBar.registerStatusItem('@jupyterlab/logconsole-extension:status', {
@@ -256,7 +275,7 @@ function activateLogConsole(
     });
   }
 
-  function setSource(newValue: Widget) {
+  function setSource(newValue: Widget | null) {
     if (logConsoleWidget && newValue === logConsoleWidget) {
       // Do not change anything if we are just focusing on ourselves
       return;
@@ -268,7 +287,7 @@ function activateLogConsole(
     } else {
       source = null;
     }
-    if (logConsoleWidget) {
+    if (logConsolePanel) {
       logConsolePanel.source = source;
     }
     status.model.source = source;
@@ -309,8 +328,10 @@ export class LogLevelSwitcher extends ReactWidget {
   /**
    * Construct a new cell type switcher.
    */
-  constructor(widget: LogConsolePanel) {
+  constructor(widget: LogConsolePanel, translator?: ITranslator) {
     super();
+    this.translator = translator || nullTranslator;
+    this._trans = this.translator.load('jupyterlab');
     this.addClass('jp-LogConsole-toolbarLogLevel');
     this._logConsole = widget;
     if (widget.source) {
@@ -339,7 +360,9 @@ export class LogLevelSwitcher extends ReactWidget {
    * Handle `change` events for the HTMLSelect component.
    */
   handleChange = (event: React.ChangeEvent<HTMLSelectElement>): void => {
-    this._logConsole.logger.level = event.target.value as LogLevel;
+    if (this._logConsole.logger) {
+      this._logConsole.logger.level = event.target.value as LogLevel;
+    }
     this.update();
   };
 
@@ -353,7 +376,7 @@ export class LogLevelSwitcher extends ReactWidget {
   };
 
   render() {
-    let logger = this._logConsole.logger;
+    const logger = this._logConsole.logger;
     return (
       <>
         <label
@@ -364,37 +387,39 @@ export class LogLevelSwitcher extends ReactWidget {
               : undefined
           }
         >
-          Log Level:
+          {this._trans.__('Log Level:')}
         </label>
         <HTMLSelect
           id={this._id}
           className="jp-LogConsole-toolbarLogLevelDropdown"
           onChange={this.handleChange}
           onKeyDown={this.handleKeyDown}
-          value={logger !== null && logger.level}
-          iconProps={{
-            icon: <span className="jp-MaterialIcon jp-DownCaretIcon bp3-icon" />
-          }}
-          aria-label="Log level"
-          minimal
+          value={logger?.level}
+          aria-label={this._trans.__('Log level')}
           disabled={logger === null}
           options={
             logger === null
               ? []
               : [
-                  'Critical',
-                  'Error',
-                  'Warning',
-                  'Info',
-                  'Debug'
-                ].map(label => ({ label, value: label.toLowerCase() }))
+                  [this._trans.__('Critical'), 'Critical'],
+                  [this._trans.__('Error'), 'Error'],
+                  [this._trans.__('Warning'), 'Warning'],
+                  [this._trans.__('Info'), 'Info'],
+                  [this._trans.__('Debug'), 'Debug']
+                ].map(data => ({
+                  label: data[0],
+                  value: data[1].toLowerCase()
+                }))
           }
         />
       </>
     );
   }
-  private _logConsole: LogConsolePanel = null;
+
+  protected translator: ITranslator;
+  private _trans: TranslationBundle;
+  private _logConsole: LogConsolePanel;
   private _id = `level-${UUID.uuid4()}`;
 }
 
-export default [logConsolePlugin, logNotebookOutput];
+export default logConsolePlugin;

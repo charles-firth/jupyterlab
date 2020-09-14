@@ -16,9 +16,6 @@
       "path": "../codemirror"
     },
     {
-      "path": "../coreutils"
-    },
-    {
       "path": "../docregistry"
     },
     {
@@ -28,7 +25,13 @@
       "path": "../mainmenu"
     },
     {
+      "path": "../settingregistry"
+    },
+    {
       "path": "../statusbar"
+    },
+    {
+      "path": "../translation"
     }
   ]
 }

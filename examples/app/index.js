@@ -9,10 +9,10 @@ __webpack_public_path__ = PageConfig.getOption('fullStaticUrl') + '/';
 // This cannot be extracted because the public path is dynamic.
 require('./build/imports.css');
 
-window.addEventListener('load', async function() {
-  var JupyterLab = require('@jupyterlab/application').JupyterLab;
+window.addEventListener('load', async function () {
+  const JupyterLab = require('@jupyterlab/application').JupyterLab;
 
-  var mods = [
+  const mods = [
     require('@jupyterlab/application-extension'),
     require('@jupyterlab/apputils-extension'),
     require('@jupyterlab/codemirror-extension'),
@@ -40,9 +40,10 @@ window.addEventListener('load', async function() {
     require('@jupyterlab/theme-dark-extension'),
     require('@jupyterlab/theme-light-extension'),
     require('@jupyterlab/tooltip-extension'),
+    require('@jupyterlab/translation-extension'),
     require('@jupyterlab/ui-components-extension')
   ];
-  var lab = new JupyterLab();
+  const lab = new JupyterLab();
   lab.registerPluginModules(mods);
   /* eslint-disable no-console */
   console.log('Starting app');

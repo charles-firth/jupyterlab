@@ -11,9 +11,11 @@ import {
 
 import { GroupItem, TextItem, interactiveItem } from '@jupyterlab/statusbar';
 
-import { DefaultIconReact } from '@jupyterlab/ui-components';
+import { nullTranslator, ITranslator } from '@jupyterlab/translation';
 
-import { Signal } from '@phosphor/signaling';
+import { listIcon } from '@jupyterlab/ui-components';
+
+import { Signal } from '@lumino/signaling';
 
 import React from 'react';
 
@@ -27,15 +29,23 @@ import React from 'react';
 function LogConsoleStatusComponent(
   props: LogConsoleStatusComponent.IProps
 ): React.ReactElement<LogConsoleStatusComponent.IProps> {
+  const translator = props.translator || nullTranslator;
+  const trans = translator.load('jupyterlab');
   let title = '';
   if (props.newMessages > 0) {
-    title = `${props.newMessages} new messages, `;
+    title = trans.__(
+      '%1 new messages, %2 log entries for %3',
+      props.newMessages,
+      props.logEntries,
+      props.source
+    );
+  } else {
+    title += trans.__('%1 log entries for %2', props.logEntries, props.source);
   }
-  title += `${props.logEntries} log entries for ${props.source}`;
   return (
     <GroupItem spacing={0} onClick={props.handleClick} title={title}>
-      <DefaultIconReact name={'list'} top={'2px'} kind={'statusBar'} />
-      {props.newMessages > 0 && <TextItem source={props.newMessages} />}
+      <listIcon.react top={'2px'} stylesheet={'statusBar'} />
+      {props.newMessages > 0 ? <TextItem source={props.newMessages} /> : <></>}
     </GroupItem>
   );
 }
@@ -67,7 +77,12 @@ namespace LogConsoleStatusComponent {
     /**
      * Log source name
      */
-    source: string;
+    source: string | null;
+
+    /**
+     * The application language translator
+     */
+    translator?: ITranslator;
   }
 }
 
@@ -81,9 +96,9 @@ export class LogConsoleStatus extends VDomRenderer<LogConsoleStatus.Model> {
    * @param options - The status widget initialization options.
    */
   constructor(options: LogConsoleStatus.IOptions) {
-    super();
+    super(new LogConsoleStatus.Model(options.loggerRegistry));
+    this.translator = options.translator || nullTranslator;
     this._handleClick = options.handleClick;
-    this.model = new LogConsoleStatus.Model(options.loggerRegistry);
     this.addClass(interactiveItem);
     this.addClass('jp-LogConsoleStatusItem');
   }
@@ -97,7 +112,7 @@ export class LogConsoleStatus extends VDomRenderer<LogConsoleStatus.Model> {
       return null;
     }
     this.show();
-    let {
+    const {
       flashEnabled,
       messages,
       source,
@@ -120,6 +135,7 @@ export class LogConsoleStatus extends VDomRenderer<LogConsoleStatus.Model> {
         logEntries={messages}
         newMessages={version - versionDisplayed}
         source={this.model.source}
+        translator={this.translator}
       />
     );
   }
@@ -144,6 +160,7 @@ export class LogConsoleStatus extends VDomRenderer<LogConsoleStatus.Model> {
     this.removeClass('jp-mod-selected');
   }
 
+  readonly translator: ITranslator;
   private _handleClick: () => void;
 }
 
@@ -218,7 +235,7 @@ export namespace LogConsoleStatus {
       if (this._source === null) {
         return 0;
       }
-      return this._sourceVersion.get(this.source).lastDisplayed;
+      return this._sourceVersion.get(this._source)?.lastDisplayed ?? 0;
     }
 
     /**
@@ -228,7 +245,7 @@ export namespace LogConsoleStatus {
       if (this._source === null) {
         return 0;
       }
-      return this._sourceVersion.get(this.source).lastNotified;
+      return this._sourceVersion.get(this._source)?.lastNotified ?? 0;
     }
 
     /**
@@ -260,11 +277,11 @@ export namespace LogConsoleStatus {
      * This will also update the last notified version so that the last
      * notified version is always at least the last displayed version.
      */
-    sourceDisplayed(source: string | null, version: number) {
-      if (source === null) {
+    sourceDisplayed(source: string | null, version: number | null) {
+      if (source === null || version === null) {
         return;
       }
-      const versions = this._sourceVersion.get(source);
+      const versions = this._sourceVersion.get(source)!;
       let change = false;
       if (versions.lastDisplayed < version) {
         versions.lastDisplayed = version;
@@ -290,8 +307,8 @@ export namespace LogConsoleStatus {
         return;
       }
       const versions = this._sourceVersion.get(source);
-      if (versions.lastNotified < version) {
-        versions.lastNotified = version;
+      if (versions!.lastNotified < version) {
+        versions!.lastNotified = version;
         if (source === this._source) {
           this.stateChanged.emit();
         }
@@ -300,7 +317,7 @@ export namespace LogConsoleStatus {
 
     private _handleLogRegistryChange() {
       const loggers = this._loggerRegistry.getLoggers();
-      for (let logger of loggers) {
+      for (const logger of loggers) {
         if (!this._sourceVersion.has(logger.source)) {
           logger.contentChanged.connect(this._handleLogContentChange, this);
           this._sourceVersion.set(logger.source, {
@@ -326,7 +343,7 @@ export namespace LogConsoleStatus {
     public flashEnabledChanged = new Signal<this, void>(this);
     private _flashEnabled: boolean = true;
     private _loggerRegistry: ILoggerRegistry;
-    private _source: string = null;
+    private _source: string | null = null;
     /**
      * The view status of each source.
      *
@@ -358,5 +375,10 @@ export namespace LogConsoleStatus {
      * Log Console panel is launched.
      */
     handleClick: () => void;
+
+    /**
+     * Language translator.
+     */
+    translator?: ITranslator;
   }
 }

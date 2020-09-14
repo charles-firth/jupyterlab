@@ -1,4 +1,4 @@
-/*-----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
 | Copyright (c) Jupyter Development Team.
 | Distributed under the terms of the Modified BSD License.
 |----------------------------------------------------------------------------*/
@@ -6,25 +6,25 @@
 import {
   ILayoutRestorer,
   JupyterFrontEnd,
-  JupyterFrontEndPlugin
+  JupyterFrontEndPlugin,
+  ILabStatus
 } from '@jupyterlab/application';
-
 import {
   ICommandPalette,
   MainAreaWidget,
   WidgetTracker
 } from '@jupyterlab/apputils';
-
 import { IEditorServices } from '@jupyterlab/codeeditor';
-
-import { ISettingRegistry, IStateDB } from '@jupyterlab/coreutils';
-
+import { IStateDB } from '@jupyterlab/statedb';
 import { IRenderMimeRegistry } from '@jupyterlab/rendermime';
-
 import {
   ISettingEditorTracker,
   SettingEditor
 } from '@jupyterlab/settingeditor';
+import { ISettingRegistry } from '@jupyterlab/settingregistry';
+import { ITranslator } from '@jupyterlab/translation';
+import { saveIcon, settingsIcon, undoIcon } from '@jupyterlab/ui-components';
+import { IDisposable } from '@lumino/disposable';
 
 /**
  * The command IDs used by the setting editor.
@@ -48,8 +48,10 @@ const plugin: JupyterFrontEndPlugin<ISettingEditorTracker> = {
     IEditorServices,
     IStateDB,
     IRenderMimeRegistry,
-    ICommandPalette
+    ILabStatus,
+    ITranslator
   ],
+  optional: [ICommandPalette],
   autoStart: true,
   provides: ISettingEditorTracker,
   activate
@@ -65,8 +67,11 @@ function activate(
   editorServices: IEditorServices,
   state: IStateDB,
   rendermime: IRenderMimeRegistry,
-  palette: ICommandPalette
+  status: ILabStatus,
+  translator: ITranslator,
+  palette: ICommandPalette | null
 ): ISettingEditorTracker {
+  const trans = translator.load('jupyterlab');
   const { commands, shell } = app;
   const namespace = 'setting-editor';
   const factoryService = editorServices.factoryService;
@@ -104,9 +109,11 @@ function activate(
         registry,
         rendermime,
         state,
+        translator,
         when
       });
 
+      let disposable: IDisposable | null = null;
       // Notify the command registry when the visibility status of the setting
       // editor's commands change. The setting editor toolbar listens for this
       // signal from the command registry.
@@ -114,34 +121,52 @@ function activate(
         args.forEach(id => {
           commands.notifyCommandChanged(id);
         });
+        if (editor.canSaveRaw) {
+          if (!disposable) {
+            disposable = status.setDirty();
+          }
+        } else if (disposable) {
+          disposable.dispose();
+          disposable = null;
+        }
+        editor.disposed.connect(() => {
+          if (disposable) {
+            disposable.dispose();
+          }
+        });
       });
 
       editor.id = namespace;
-      editor.title.label = 'Settings';
-      editor.title.iconClass = 'jp-SettingsIcon';
+      editor.title.icon = settingsIcon;
+      editor.title.label = trans.__('Settings');
 
-      let main = new MainAreaWidget({ content: editor });
+      const main = new MainAreaWidget({ content: editor });
       void tracker.add(main);
       shell.add(main);
     },
-    label: 'Advanced Settings Editor'
+    label: trans.__('Advanced Settings Editor')
   });
-  palette.addItem({ category: 'Settings', command: CommandIDs.open });
+  if (palette) {
+    palette.addItem({
+      category: trans.__('Settings'),
+      command: CommandIDs.open
+    });
+  }
 
   commands.addCommand(CommandIDs.revert, {
     execute: () => {
-      tracker.currentWidget.content.revert();
+      tracker.currentWidget?.content.revert();
     },
-    iconClass: 'jp-MaterialIcon jp-UndoIcon',
-    label: 'Revert User Settings',
-    isEnabled: () => tracker.currentWidget.content.canRevertRaw
+    icon: undoIcon,
+    label: trans.__('Revert User Settings'),
+    isEnabled: () => tracker.currentWidget?.content.canRevertRaw ?? false
   });
 
   commands.addCommand(CommandIDs.save, {
-    execute: () => tracker.currentWidget.content.save(),
-    iconClass: 'jp-MaterialIcon jp-SaveIcon',
-    label: 'Save User Settings',
-    isEnabled: () => tracker.currentWidget.content.canSaveRaw
+    execute: () => tracker.currentWidget?.content.save(),
+    icon: saveIcon,
+    label: trans.__('Save User Settings'),
+    isEnabled: () => tracker.currentWidget?.content.canSaveRaw ?? false
   });
 
   return tracker;

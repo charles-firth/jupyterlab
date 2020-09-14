@@ -1,4 +1,4 @@
-/*-----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
 | Copyright (c) Jupyter Development Team.
 | Distributed under the terms of the Modified BSD License.
 |----------------------------------------------------------------------------*/
@@ -8,7 +8,6 @@ import { Dialog, ICommandPalette, showDialog } from '@jupyterlab/apputils';
 import {
   ConnectionLost,
   IConnectionLost,
-  IRouter,
   JupyterFrontEnd,
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
@@ -18,6 +17,7 @@ import { URLExt } from '@jupyterlab/coreutils';
 import { IMainMenu } from '@jupyterlab/mainmenu';
 
 import { ServerConnection, ServiceManager } from '@jupyterlab/services';
+import { ITranslator } from '@jupyterlab/translation';
 
 /**
  * The command IDs used by the plugin.
@@ -35,11 +35,12 @@ export namespace CommandIDs {
  */
 function activateHubExtension(
   app: JupyterFrontEnd,
-  router: IRouter,
   paths: JupyterFrontEnd.IPaths,
-  palette: ICommandPalette,
-  mainMenu: IMainMenu
+  translator: ITranslator,
+  palette: ICommandPalette | null,
+  mainMenu: IMainMenu | null
 ): void {
+  const trans = translator.load('jupyterlab');
   const hubHost = paths.urls.hubHost || '';
   const hubPrefix = paths.urls.hubPrefix || '';
   const hubUser = paths.urls.hubUser || '';
@@ -51,7 +52,7 @@ function activateHubExtension(
     return;
   }
 
-  console.log('hub-extension: Found configuration ', {
+  console.debug('hub-extension: Found configuration ', {
     hubHost: hubHost,
     hubPrefix: hubPrefix
   });
@@ -64,37 +65,41 @@ function activateHubExtension(
   const { commands } = app;
 
   commands.addCommand(CommandIDs.restart, {
-    label: 'Restart Server',
-    caption: 'Request that the Hub restart this server',
+    label: trans.__('Restart Server'),
+    caption: trans.__('Request that the Hub restart this server'),
     execute: () => {
       window.open(restartUrl, '_blank');
     }
   });
 
   commands.addCommand(CommandIDs.controlPanel, {
-    label: 'Hub Control Panel',
-    caption: 'Open the Hub control panel in a new browser tab',
+    label: trans.__('Hub Control Panel'),
+    caption: trans.__('Open the Hub control panel in a new browser tab'),
     execute: () => {
       window.open(hubHost + URLExt.join(hubPrefix, 'home'), '_blank');
     }
   });
 
   commands.addCommand(CommandIDs.logout, {
-    label: 'Log Out',
-    caption: 'Log out of the Hub',
+    label: trans.__('Log Out'),
+    caption: trans.__('Log out of the Hub'),
     execute: () => {
       window.location.href = hubHost + URLExt.join(baseUrl, 'logout');
     }
   });
 
-  // Add commands and menu itmes.
-  mainMenu.fileMenu.addGroup(
-    [{ command: CommandIDs.controlPanel }, { command: CommandIDs.logout }],
-    100
-  );
-  const category = 'Hub';
-  palette.addItem({ category, command: CommandIDs.controlPanel });
-  palette.addItem({ category, command: CommandIDs.logout });
+  // Add palette and menu itmes.
+  if (mainMenu) {
+    mainMenu.fileMenu.addGroup(
+      [{ command: CommandIDs.controlPanel }, { command: CommandIDs.logout }],
+      100
+    );
+  }
+  if (palette) {
+    const category = trans.__('Hub');
+    palette.addItem({ category, command: CommandIDs.controlPanel });
+    palette.addItem({ category, command: CommandIDs.logout });
+  }
 }
 
 /**
@@ -103,7 +108,8 @@ function activateHubExtension(
 const hubExtension: JupyterFrontEndPlugin<void> = {
   activate: activateHubExtension,
   id: 'jupyter.extensions.hub-extension',
-  requires: [IRouter, JupyterFrontEnd.IPaths, ICommandPalette, IMainMenu],
+  requires: [JupyterFrontEnd.IPaths, ITranslator],
+  optional: [ICommandPalette, IMainMenu],
   autoStart: true
 };
 
@@ -117,11 +123,13 @@ const hubExtension: JupyterFrontEndPlugin<void> = {
  */
 const connectionlost: JupyterFrontEndPlugin<IConnectionLost> = {
   id: '@jupyterlab/apputils-extension:connectionlost',
-  requires: [JupyterFrontEnd.IPaths],
+  requires: [JupyterFrontEnd.IPaths, ITranslator],
   activate: (
     app: JupyterFrontEnd,
-    paths: JupyterFrontEnd.IPaths
+    paths: JupyterFrontEnd.IPaths,
+    translator: ITranslator
   ): IConnectionLost => {
+    const trans = translator.load('jupyterlab');
     const hubPrefix = paths.urls.hubPrefix || '';
     const baseUrl = paths.urls.base;
 
@@ -142,12 +150,14 @@ const connectionlost: JupyterFrontEndPlugin<IConnectionLost> = {
       }
       showingError = true;
       const result = await showDialog({
-        title: 'Server Not Running',
-        body: `Your server at ${baseUrl} is not running.
-Would you like to restart it?`,
+        title: trans.__('Server Not Running'),
+        body: trans.__(
+          'Your server at %1 is not running.\nWould you like to restart it?',
+          baseUrl
+        ),
         buttons: [
-          Dialog.okButton({ label: 'Restart' }),
-          Dialog.cancelButton({ label: 'Dismiss' })
+          Dialog.okButton({ label: trans.__('Restart') }),
+          Dialog.cancelButton({ label: trans.__('Dismiss') })
         ]
       });
       showingError = false;

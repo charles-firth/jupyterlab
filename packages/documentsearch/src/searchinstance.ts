@@ -1,19 +1,25 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { IDisplayState, ISearchProvider } from './interfaces';
+import { IDisplayState, ISearchProvider, IFiltersType } from './interfaces';
 import { createSearchOverlay } from './searchoverlay';
 
 import { MainAreaWidget } from '@jupyterlab/apputils';
-import { IDisposable } from '@phosphor/disposable';
-import { ISignal, Signal } from '@phosphor/signaling';
-import { Widget } from '@phosphor/widgets';
+import { nullTranslator, ITranslator } from '@jupyterlab/translation';
+import { IDisposable } from '@lumino/disposable';
+import { ISignal, Signal } from '@lumino/signaling';
+import { Widget } from '@lumino/widgets';
 
 /**
  * Represents a search on a single widget.
  */
 export class SearchInstance implements IDisposable {
-  constructor(widget: Widget, searchProvider: ISearchProvider) {
+  constructor(
+    widget: Widget,
+    searchProvider: ISearchProvider,
+    translator?: ITranslator
+  ) {
+    this.translator = translator || nullTranslator;
     this._widget = widget;
     this._activeProvider = searchProvider;
 
@@ -31,7 +37,9 @@ export class SearchInstance implements IDisposable {
       onReplaceCurrent: this._replaceCurrent.bind(this),
       onReplaceAll: this._replaceAll.bind(this),
       onEndSearch: this.dispose.bind(this),
-      isReadOnly: this._activeProvider.isReadOnly
+      isReadOnly: this._activeProvider.isReadOnly,
+      hasOutputs: this._activeProvider.hasOutputs || false,
+      translator: this.translator
     });
 
     this._widget.disposed.connect(() => {
@@ -77,6 +85,12 @@ export class SearchInstance implements IDisposable {
   }
 
   /**
+   * If there is a replace box, show it.
+   */
+  showReplace(): void {
+    this._displayState.replaceEntryShown = true;
+  }
+  /**
    * Updates the match index and total display in the search widget.
    */
   updateIndices(): void {
@@ -93,13 +107,14 @@ export class SearchInstance implements IDisposable {
     this._displayUpdateSignal.emit(this._displayState);
   }
 
-  private async _startQuery(query: RegExp) {
+  private async _startQuery(query: RegExp, filters: IFiltersType) {
     // save the last query (or set it to the current query if this is the first)
     if (this._activeProvider && this._displayState.query) {
       await this._activeProvider.endQuery();
     }
     this._displayState.query = query;
-    await this._activeProvider.startQuery(query, this._widget);
+    this._displayState.filters = filters;
+    await this._activeProvider.startQuery(query, this._widget, filters);
     this.updateIndices();
 
     // this signal should get injected when the widget is
@@ -108,14 +123,14 @@ export class SearchInstance implements IDisposable {
   }
 
   private async _replaceCurrent(newText: string) {
-    if (this._activeProvider && this._displayState.query && !!newText) {
+    if (this._activeProvider && this._displayState.query) {
       await this._activeProvider.replaceCurrentMatch(newText);
       this.updateIndices();
     }
   }
 
   private async _replaceAll(newText: string) {
-    if (this._activeProvider && this._displayState.query && !!newText) {
+    if (this._activeProvider && this._displayState.query) {
       await this._activeProvider.replaceAllMatches(newText);
       this.updateIndices();
     }
@@ -202,8 +217,12 @@ export class SearchInstance implements IDisposable {
     replaceInputFocused: false,
     forceFocus: true,
     replaceText: '',
-    replaceEntryShown: false
+    replaceEntryShown: false,
+    filters: { output: true },
+    filtersOpen: false
   };
+
+  protected translator: ITranslator;
   private _displayUpdateSignal = new Signal<this, IDisplayState>(this);
   private _activeProvider: ISearchProvider;
   private _searchWidget: Widget;

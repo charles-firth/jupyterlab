@@ -27,6 +27,10 @@ import { ILauncher } from '@jupyterlab/launcher';
 
 import { INotebookTracker } from '@jupyterlab/notebook';
 
+import { ITranslator } from '@jupyterlab/translation';
+
+import { inspectorIcon } from '@jupyterlab/ui-components';
+
 /**
  * The command IDs used by the inspector plugin.
  */
@@ -39,18 +43,21 @@ namespace CommandIDs {
  */
 const inspector: JupyterFrontEndPlugin<IInspector> = {
   id: '@jupyterlab/inspector-extension:inspector',
+  requires: [ITranslator],
   optional: [ICommandPalette, ILauncher, ILayoutRestorer],
   provides: IInspector,
   autoStart: true,
   activate: (
     app: JupyterFrontEnd,
+    translator: ITranslator,
     palette: ICommandPalette | null,
     launcher: ILauncher | null,
     restorer: ILayoutRestorer | null
   ): IInspector => {
+    const trans = translator.load('jupyterlab');
     const { commands, shell } = app;
     const command = CommandIDs.open;
-    const label = 'Show Contextual Help';
+    const label = trans.__('Show Contextual Help');
     const namespace = 'inspector';
     const tracker = new WidgetTracker<MainAreaWidget<InspectorPanel>>({
       namespace
@@ -60,7 +67,9 @@ const inspector: JupyterFrontEndPlugin<IInspector> = {
     let inspector: MainAreaWidget<InspectorPanel>;
     function openInspector(): MainAreaWidget<InspectorPanel> {
       if (!inspector || inspector.isDisposed) {
-        inspector = new MainAreaWidget({ content: new InspectorPanel() });
+        inspector = new MainAreaWidget({
+          content: new InspectorPanel({ translator })
+        });
         inspector.id = 'jp-inspector';
         inspector.title.label = label;
         void tracker.add(inspector);
@@ -76,15 +85,16 @@ const inspector: JupyterFrontEndPlugin<IInspector> = {
 
     // Add command to registry.
     commands.addCommand(command, {
-      caption: 'Live updating code documentation from the active kernel',
+      caption: trans.__(
+        'Live updating code documentation from the active kernel'
+      ),
       isEnabled: () =>
         !inspector ||
         inspector.isDisposed ||
         !inspector.isAttached ||
         !inspector.isVisible,
       label,
-      iconClass: args =>
-        args.isLauncher ? 'jp-MaterialIcon jp-InspectorIcon' : '',
+      icon: args => (args.isLauncher ? inspectorIcon : undefined),
       execute: () => openInspector()
     });
 
@@ -128,23 +138,24 @@ const consoles: JupyterFrontEndPlugin<void> = {
     app: JupyterFrontEnd,
     manager: IInspector,
     consoles: IConsoleTracker,
-    labShell: ILabShell
+    labShell: ILabShell,
+    translator: ITranslator
   ): void => {
     // Maintain association of new consoles with their respective handlers.
     const handlers: { [id: string]: InspectionHandler } = {};
 
     // Create a handler for each console that is created.
     consoles.widgetAdded.connect((sender, parent) => {
-      const session = parent.console.session;
+      const sessionContext = parent.console.sessionContext;
       const rendermime = parent.console.rendermime;
-      const connector = new KernelConnector({ session });
+      const connector = new KernelConnector({ sessionContext });
       const handler = new InspectionHandler({ connector, rendermime });
 
       // Associate the handler to the widget.
       handlers[parent.id] = handler;
 
       // Set the initial editor.
-      let cell = parent.console.promptCell;
+      const cell = parent.console.promptCell;
       handler.editor = cell && cell.editor;
 
       // Listen for prompt creation.
@@ -161,11 +172,11 @@ const consoles: JupyterFrontEndPlugin<void> = {
 
     // Keep track of console instances and set inspector source.
     labShell.currentChanged.connect((_, args) => {
-      let widget = args.newValue;
+      const widget = args.newValue;
       if (!widget || !consoles.has(widget)) {
         return;
       }
-      let source = handlers[widget.id];
+      const source = handlers[widget.id];
       if (source) {
         manager.source = source;
       }
@@ -196,16 +207,16 @@ const notebooks: JupyterFrontEndPlugin<void> = {
 
     // Create a handler for each notebook that is created.
     notebooks.widgetAdded.connect((sender, parent) => {
-      const session = parent.session;
+      const sessionContext = parent.sessionContext;
       const rendermime = parent.content.rendermime;
-      const connector = new KernelConnector({ session });
+      const connector = new KernelConnector({ sessionContext });
       const handler = new InspectionHandler({ connector, rendermime });
 
       // Associate the handler to the widget.
       handlers[parent.id] = handler;
 
       // Set the initial editor.
-      let cell = parent.content.activeCell;
+      const cell = parent.content.activeCell;
       handler.editor = cell && cell.editor;
 
       // Listen for active cell changes.
@@ -222,11 +233,11 @@ const notebooks: JupyterFrontEndPlugin<void> = {
 
     // Keep track of notebook instances and set inspector source.
     labShell.currentChanged.connect((sender, args) => {
-      let widget = args.newValue;
+      const widget = args.newValue;
       if (!widget || !notebooks.has(widget)) {
         return;
       }
-      let source = handlers[widget.id];
+      const source = handlers[widget.id];
       if (source) {
         manager.source = source;
       }

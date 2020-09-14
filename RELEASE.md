@@ -43,7 +43,11 @@ makes sure that we don't have any extra tags or commits in our repo (especially
 since we will push our tags later in the process), and that we are on the correct branch. The script creates a conda env, pulls down a git checkout with the
 appropriate branch, and installs JupyterLab with `pip install -e .`.
 
-`source scripts/release_prep.sh <branch_name>`
+Make sure you are running an sh-compatible shell, and it is set up to be able to do `conda activate`. Then do:
+
+```bash
+source scripts/release_prep.sh <branch_name>
+```
 
 ## Bump version
 
@@ -54,15 +58,23 @@ version, and we keep the JS versions and tags in sync with the release cycle.
 Here is an example of how version numbers progress through a release process.
 Choose and run an appropriate command to bump version numbers for this release.
 
-| Command                            | Python Version Change | NPM Version change                 |
-| ---------------------------------- | --------------------- | ---------------------------------- |
-| `jlpm bumpversion minor`           | x.y.z-> x.(y+1).0.a0  | All a.b.c -> a.(b+1).0-alpha.0     |
-| `jlpm bumpversion build`           | x.y.z.a0-> x.y.z.a1   | All a.b.c-alpha.0 -> a.b.c-alpha.1 |
-| `jlpm bumpversion release`         | x.y.z.a1-> x.y.z.rc0  | All a.b.c-alpha.1 -> a.b.c-rc.0    |
-| `jlpm bumpversion release`         | x.y.z.rc0-> x.y.z     | All a.b.c-rc0 -> a.b.c             |
-| `jlpm patch:release [...packages]` | x.y.z -> x.y.(z+1)    | Selected a.b.c -> a.b.(c+1)        |
+| Command                    | Python Version Change | NPM Version change                 |
+| -------------------------- | --------------------- | ---------------------------------- |
+| `jlpm bumpversion minor`   | x.y.z-> x.(y+1).0.a0  | All a.b.c -> a.(b+10).0-alpha.0    |
+| `jlpm bumpversion build`   | x.y.z.a0-> x.y.z.a1   | All a.b.c-alpha.0 -> a.b.c-alpha.1 |
+| `jlpm bumpversion release` | x.y.z.a1-> x.y.z.b0   | All a.b.c-alpha.1 -> a.b.c-beta.0  |
+| `jlpm bumpversion release` | x.y.z.a1-> x.y.z.rc0  | All a.b.c-alpha.1 -> a.b.c-rc.0    |
+| `jlpm bumpversion release` | x.y.z.rc0-> x.y.z     | All a.b.c-rc0 -> a.b.c             |
+| `jlpm patch:release`       | x.y.z -> x.y.(z+1)    | Changed a.b.c -> a.b.(c+1)         |
 
-Note: if you are making a patch release, and want to update whatever JS packages changed, just do `jlpm patch:release js` (in fact, _any_ argument, not just `js`, forces all JS packages to be examined).
+Note: For a minor release, we bump the JS packages by 10 versions so that
+we are not competing amongst the minor releases for version numbers.
+We are essentially sub-dividing semver to allow us to bump minor versions
+of the JS packages as many times as we need to for minor releases of the
+top level JupyterLab application.
+
+Other note: It's ok if `yarn-deduplicate` exits with a non zero code. This is
+expected!
 
 ### JS major release(s)
 
@@ -78,15 +90,9 @@ Results:
 - Python package is not affected.
 - JS dependencies are also bumped a major version.
 - Packages that have already had a major bump in this prerelease cycle are not affected.
-- All affected packages changed to match the current release type of the Python package (`alpha` or `rc`).
+- All affected packages changed to match the current release type of the Python package (`alpha`, `beta`, or `rc`).
 
 ## Publishing Packages
-
-Currently we end up with some uncommitted changes at this step. We'll need to commit them before running the publish.
-
-```bash
-git commit -am "bump version"
-```
 
 Now publish the JS packages and build the python packages
 
@@ -109,11 +115,16 @@ IntSlider()
 
 ## Finish
 
-Follow instructions printed at the end of the publish step above, including:
+Follow instructions printed at the end of the publish step above:
 
-- committing changes
-- tagging the release
-- and uploading to pypi with twine
+```bash
+twine upload dist/*
+git push origin --tags <BRANCH>
+```
+
+These lines:
+
+- upload to pypi with twine
 - double-check what branch you are on, then push changes to the correct upstream branch with the `--tags` option.
 
 ## Post release candidate checklist
@@ -149,6 +160,7 @@ Now do the actual final release:
 - [ ] Push the commit and tags to master
 - [ ] Run `npm run publish:all` to publish the packages
 - [ ] Create a branch for the release and push to GitHub
+- [ ] Update the API [docs](#updating-api-docs)
 - [ ] Merge the PRs on the other repos and set the default branch of the
       xckd repo
 - [ ] Publish to [conda-forge](https://github.com/jupyterlab/jupyterlab/blob/master/RELEASE.md#publishing-to-conda-forge).
@@ -178,7 +190,7 @@ commit and other commits that involve installing packages to update to the new
 versions:
 
 ```bash
-git checkout -b 0.XX # whatever the new version is
+git checkout -b BRANCH # whatever the new version is, e.g., 1.0
 git rebase -i --root
 ```
 
@@ -196,10 +208,10 @@ updating package versions, then do the next steps instead.
 git checkout --orphan name-of-branch
 git rm -rf .
 git clean -dfx
-cookiecutter path-to-local-extension-cookiecutter-ts
+cookiecutter -o initial path-to-local-extension-cookiecutter-ts
 # Fill in the values from the previous branch package.json initial commit
-cp -r jupyterlab_apod/ .
-rm -rf jupyterlab_apod
+cp -r initial/jupyterlab_apod .
+rm -rf initial
 ```
 
 - Create a new PR in JupyterLab.
@@ -211,34 +223,34 @@ rm -rf jupyterlab_apod
 
 #### Publishing extension tutorial changes
 
-- Replace the tag references in the tutorial with the new branch number, e.g.
-  replace `1.0-` with `1.1-`. Prefix the new tags with the branch name, e.g.
-  `1.0-01-show-a-panel`
-  ```bash
-  git tag 0.XX-01-show-a-panel HEAD~5
-  git tag 0.XX-02-show-an-image HEAD~4
-  git tag 0.XX-03-style-and-attribute HEAD~3
-  git tag 0.XX-04-refactor-and-refresh HEAD~2
-  git tag 0.XX-05-restore-panel-state HEAD~1
-  git tag 0.XX-06-prepare-to-publish HEAD
+- Tag commits in the branch with the appropriate `branch-step` tag. If you are at the final commit, you can tag all commits with the below, replacing `BRANCH` with the branch name (e.g., `1.0-01-show-a-panel`) ```bash
+  git tag BRANCH-01-show-a-panel HEAD~4
+  git tag BRANCH-02-show-an-image HEAD~3
+  git tag BRANCH-03-style-and-attribute HEAD~2
+  git tag BRANCH-04-refactor-and-refresh HEAD~1
+  git tag BRANCH-05-restore-panel-state HEAD
+
   ```
+
+  ```
+
 - Push the branch with the new tags
   ```bash
-  git push origin 0.XX --tags
+  git push origin BRANCH --tags
   ```
   Set the branch as the default branch (see `github.com/jupyterlab/jupyterlab_apod/settings/branches`).
 - If there were changes to the example in the documentation, submit a PR to JupyterLab
-- Publish the new `@jupyterlab/apod` npm package. Make sure to update the version
+- Publish the new `jupyterlab_apod` python package. Make sure to update the version
   number in the last commit of the branch.
   ```bash
-  npm publish
+  twine upload dist/*
   ```
 
 If you make a mistake and need to start over, clear the tags using the
-following pattern:
+following pattern (replacing `BRANCH` with the branch name):
 
 ```bash
-git tag | grep 0.XX | xargs git tag -d
+git tag | grep BRANCH | xargs git tag -d
 ```
 
 ### Publishing to conda-forge
@@ -254,6 +266,10 @@ shasum -a 256 dist/*.tar.gz
 - Fork https://github.com/conda-forge/jupyterlab-feedstock
 - Create a PR with the version bump
 - Update `recipe/meta.yaml` with the new version and md5 and reset the build number to 0.
+
+## Updating API Docs
+
+Run `source scripts/docs_push.sh` to update the `gh-pages` branch that backs http://jupyterlab.github.io/jupyterlab/.
 
 ## Making a patch release
 

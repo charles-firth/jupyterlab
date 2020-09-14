@@ -18,7 +18,8 @@ import {
 } from '@jupyterlab/documentsearch';
 
 import { IMainMenu } from '@jupyterlab/mainmenu';
-import { Widget } from '@phosphor/widgets';
+import { ITranslator } from '@jupyterlab/translation';
+import { Widget } from '@lumino/widgets';
 
 const SEARCHABLE_CLASS = 'jp-mod-searchable';
 
@@ -33,7 +34,7 @@ const labShellWidgetListener: JupyterFrontEndPlugin<void> = {
   ) => {
     // If a given widget is searchable, apply the searchable class.
     // If it's not searchable, remove the class.
-    const transformWidgetSearchability = (widget: Widget) => {
+    const transformWidgetSearchability = (widget: Widget | null) => {
       if (!widget) {
         return;
       }
@@ -72,13 +73,17 @@ const labShellWidgetListener: JupyterFrontEndPlugin<void> = {
 const extension: JupyterFrontEndPlugin<ISearchProviderRegistry> = {
   id: '@jupyterlab/documentsearch:plugin',
   provides: ISearchProviderRegistry,
+  requires: [ITranslator],
   optional: [ICommandPalette, IMainMenu],
   autoStart: true,
   activate: (
     app: JupyterFrontEnd,
+    translator: ITranslator,
     palette: ICommandPalette,
     mainMenu: IMainMenu | null
   ) => {
+    const trans = translator.load('jupyterlab');
+
     // Create registry, retrieve all default providers
     const registry: SearchProviderRegistry = new SearchProviderRegistry();
 
@@ -89,51 +94,77 @@ const extension: JupyterFrontEndPlugin<ISearchProviderRegistry> = {
     const activeSearches = new Map<string, SearchInstance>();
 
     const startCommand: string = 'documentsearch:start';
+    const startReplaceCommand: string = 'documentsearch:startWithReplace';
     const nextCommand: string = 'documentsearch:highlightNext';
     const prevCommand: string = 'documentsearch:highlightPrevious';
-    app.commands.addCommand(startCommand, {
-      label: 'Find…',
-      isEnabled: () => {
-        const currentWidget = app.shell.currentWidget;
-        if (!currentWidget) {
-          return;
-        }
-        return registry.getProviderForWidget(currentWidget) !== undefined;
-      },
-      execute: () => {
-        const currentWidget = app.shell.currentWidget;
-        if (!currentWidget) {
-          return;
-        }
-        const widgetId = currentWidget.id;
-        let searchInstance = activeSearches.get(widgetId);
-        if (!searchInstance) {
-          const searchProvider = registry.getProviderForWidget(currentWidget);
-          if (!searchProvider) {
-            return;
-          }
-          searchInstance = new SearchInstance(currentWidget, searchProvider);
 
-          activeSearches.set(widgetId, searchInstance);
-          // find next and previous are now enabled
+    const currentWidgetHasSearchProvider = () => {
+      const currentWidget = app.shell.currentWidget;
+      if (!currentWidget) {
+        return false;
+      }
+      return registry.getProviderForWidget(currentWidget) !== undefined;
+    };
+    const getCurrentWidgetSearchInstance = () => {
+      const currentWidget = app.shell.currentWidget;
+      if (!currentWidget) {
+        return;
+      }
+      const widgetId = currentWidget.id;
+      let searchInstance = activeSearches.get(widgetId);
+      if (!searchInstance) {
+        const searchProvider = registry.getProviderForWidget(currentWidget);
+        if (!searchProvider) {
+          return;
+        }
+        searchInstance = new SearchInstance(
+          currentWidget,
+          searchProvider,
+          translator
+        );
+
+        activeSearches.set(widgetId, searchInstance);
+        // find next and previous are now enabled
+        app.commands.notifyCommandChanged();
+
+        searchInstance.disposed.connect(() => {
+          activeSearches.delete(widgetId);
+          // find next and previous are now not enabled
           app.commands.notifyCommandChanged();
+        });
+      }
+      return searchInstance;
+    };
 
-          searchInstance.disposed.connect(() => {
-            activeSearches.delete(widgetId);
-            // find next and previous are now not enabled
-            app.commands.notifyCommandChanged();
-          });
+    app.commands.addCommand(startCommand, {
+      label: trans.__('Find…'),
+      isEnabled: currentWidgetHasSearchProvider,
+      execute: () => {
+        const searchInstance = getCurrentWidgetSearchInstance();
+        if (searchInstance) {
+          searchInstance.focusInput();
         }
-        searchInstance.focusInput();
+      }
+    });
+
+    app.commands.addCommand(startReplaceCommand, {
+      label: trans.__('Find and Replace…'),
+      isEnabled: currentWidgetHasSearchProvider,
+      execute: () => {
+        const searchInstance = getCurrentWidgetSearchInstance();
+        if (searchInstance) {
+          searchInstance.showReplace();
+          searchInstance.focusInput();
+        }
       }
     });
 
     app.commands.addCommand(nextCommand, {
-      label: 'Find Next',
+      label: trans.__('Find Next'),
       isEnabled: () => {
         const currentWidget = app.shell.currentWidget;
         if (!currentWidget) {
-          return;
+          return false;
         }
         return activeSearches.has(currentWidget.id);
       },
@@ -153,11 +184,11 @@ const extension: JupyterFrontEndPlugin<ISearchProviderRegistry> = {
     });
 
     app.commands.addCommand(prevCommand, {
-      label: 'Find Previous',
+      label: trans.__('Find Previous'),
       isEnabled: () => {
         const currentWidget = app.shell.currentWidget;
         if (!currentWidget) {
-          return;
+          return false;
         }
         return activeSearches.has(currentWidget.id);
       },
@@ -178,9 +209,18 @@ const extension: JupyterFrontEndPlugin<ISearchProviderRegistry> = {
 
     // Add the command to the palette.
     if (palette) {
-      palette.addItem({ command: startCommand, category: 'Main Area' });
-      palette.addItem({ command: nextCommand, category: 'Main Area' });
-      palette.addItem({ command: prevCommand, category: 'Main Area' });
+      palette.addItem({
+        command: startCommand,
+        category: trans.__('Main Area')
+      });
+      palette.addItem({
+        command: nextCommand,
+        category: trans.__('Main Area')
+      });
+      palette.addItem({
+        command: prevCommand,
+        category: trans.__('Main Area')
+      });
     }
     // Add main menu notebook menu.
     if (mainMenu) {

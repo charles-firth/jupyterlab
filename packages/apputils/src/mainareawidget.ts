@@ -1,9 +1,11 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { Message, MessageLoop } from '@phosphor/messaging';
+import { ITranslator } from '@jupyterlab/translation';
 
-import { BoxLayout, Widget } from '@phosphor/widgets';
+import { Message, MessageLoop } from '@lumino/messaging';
+
+import { BoxLayout, Widget } from '@lumino/widgets';
 
 import { Spinner } from './spinner';
 
@@ -22,7 +24,8 @@ import { Printing } from './printing';
  * This widget is automatically disposed when closed.
  * This widget ensures its own focus when activated.
  */
-export class MainAreaWidget<T extends Widget = Widget> extends Widget
+export class MainAreaWidget<T extends Widget = Widget>
+  extends Widget
   implements Printing.IPrintable {
   /**
    * Construct a new main area widget.
@@ -83,9 +86,9 @@ export class MainAreaWidget<T extends Widget = Widget> extends Widget
           this.node.removeChild(spinner.node);
           spinner.dispose();
           content.dispose();
-          this._content = null;
+          this._content = null!;
           toolbar.dispose();
-          this._toolbar = null;
+          this._toolbar = null!;
           layout.addWidget(error);
           this._isRevealed = true;
           throw error;
@@ -103,6 +106,9 @@ export class MainAreaWidget<T extends Widget = Widget> extends Widget
    * Print method. Defered to content.
    */
   [Printing.symbol](): Printing.OptionalAsyncThunk {
+    if (!this._content) {
+      return null;
+    }
     return Printing.getPrintFunction(this._content);
   }
 
@@ -158,20 +164,23 @@ export class MainAreaWidget<T extends Widget = Widget> extends Widget
    * Handle `'update-request'` messages by forwarding them to the content.
    */
   protected onUpdateRequest(msg: Message): void {
-    MessageLoop.sendMessage(this._content, msg);
+    if (this._content) {
+      MessageLoop.sendMessage(this._content, msg);
+    }
   }
 
   /**
    * Update the title based on the attributes of the child widget.
    */
   private _updateTitle(): void {
-    if (this._changeGuard) {
+    if (this._changeGuard || !this.content) {
       return;
     }
     this._changeGuard = true;
     const content = this.content;
     this.title.label = content.title.label;
     this.title.mnemonic = content.title.mnemonic;
+    this.title.icon = content.title.icon;
     this.title.iconClass = content.title.iconClass;
     this.title.iconLabel = content.title.iconLabel;
     this.title.caption = content.title.caption;
@@ -184,13 +193,14 @@ export class MainAreaWidget<T extends Widget = Widget> extends Widget
    * Update the content title based on attributes of the main widget.
    */
   private _updateContentTitle(): void {
-    if (this._changeGuard) {
+    if (this._changeGuard || !this.content) {
       return;
     }
     this._changeGuard = true;
     const content = this.content;
     content.title.label = this.title.label;
     content.title.mnemonic = this.title.mnemonic;
+    content.title.icon = this.title.icon;
     content.title.iconClass = this.title.iconClass;
     content.title.iconLabel = this.title.iconLabel;
     content.title.caption = this.title.caption;
@@ -203,6 +213,9 @@ export class MainAreaWidget<T extends Widget = Widget> extends Widget
    * Give focus to the content.
    */
   private _focusContent(): void {
+    if (!this.content) {
+      return;
+    }
     // Focus the content node if we aren't already focused on it or a
     // descendent.
     if (!this.content.node.contains(document.activeElement)) {
@@ -244,6 +257,11 @@ export namespace MainAreaWidget {
      * An optional promise for when the content is ready to be revealed.
      */
     reveal?: Promise<any>;
+
+    /**
+     * The application language translator.
+     */
+    translator?: ITranslator;
   }
 
   /**

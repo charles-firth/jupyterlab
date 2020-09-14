@@ -1,23 +1,29 @@
-/*-----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
 | Copyright (c) Jupyter Development Team.
 | Distributed under the terms of the Modified BSD License.
 |----------------------------------------------------------------------------*/
 
 import { CodeEditor } from '@jupyterlab/codeeditor';
 
-import { ISettingRegistry, IStateDB } from '@jupyterlab/coreutils';
-
 import { IRenderMimeRegistry } from '@jupyterlab/rendermime';
 
-import { CommandRegistry } from '@phosphor/commands';
+import { ISettingRegistry } from '@jupyterlab/settingregistry';
 
-import { JSONExt, JSONObject, JSONValue } from '@phosphor/coreutils';
+import { IStateDB } from '@jupyterlab/statedb';
 
-import { Message } from '@phosphor/messaging';
+import { nullTranslator, ITranslator } from '@jupyterlab/translation';
 
-import { ISignal } from '@phosphor/signaling';
+import { jupyterIcon } from '@jupyterlab/ui-components';
 
-import { PanelLayout, Widget } from '@phosphor/widgets';
+import { CommandRegistry } from '@lumino/commands';
+
+import { JSONExt, JSONObject, JSONValue } from '@lumino/coreutils';
+
+import { Message } from '@lumino/messaging';
+
+import { ISignal } from '@lumino/signaling';
+
+import { PanelLayout, Widget } from '@lumino/widgets';
 
 import * as React from 'react';
 
@@ -50,6 +56,7 @@ export class SettingEditor extends Widget {
    */
   constructor(options: SettingEditor.IOptions) {
     super();
+    this.translator = options.translator || nullTranslator;
     this.addClass('jp-SettingEditor');
     this.key = options.key;
     this.state = options.state;
@@ -67,14 +74,19 @@ export class SettingEditor extends Widget {
       commands,
       editorFactory,
       registry,
-      rendermime
+      rendermime,
+      translator: this.translator
     }));
     const confirm = () => editor.confirm();
-    const list = (this._list = new PluginList({ confirm, registry }));
+    const list = (this._list = new PluginList({
+      confirm,
+      registry,
+      translator: this.translator
+    }));
     const when = options.when;
 
     instructions.addClass('jp-SettingEditorInstructions');
-    Private.populateInstructionsNode(instructions.node);
+    Private.populateInstructionsNode(instructions.node, this.translator);
 
     if (when) {
       this._when = Array.isArray(when) ? Promise.all(when) : when;
@@ -133,7 +145,7 @@ export class SettingEditor extends Widget {
   /**
    * The currently loaded settings.
    */
-  get settings(): ISettingRegistry.ISettings {
+  get settings(): ISettingRegistry.ISettings | null {
     return this._editor.settings;
   }
 
@@ -321,6 +333,7 @@ export class SettingEditor extends Widget {
       });
   }
 
+  protected translator: ITranslator;
   private _editor: PluginEditor;
   private _fetching: Promise<void> | null = null;
   private _instructions: Widget;
@@ -388,6 +401,11 @@ export namespace SettingEditor {
      * The point after which the editor should restore its state.
      */
     when?: Promise<any> | Array<Promise<any>>;
+
+    /**
+     * The application language translator.
+     */
+    translator?: ITranslator;
   }
 
   /**
@@ -424,17 +442,28 @@ namespace Private {
   /**
    * Populate the instructions text node.
    */
-  export function populateInstructionsNode(node: HTMLElement): void {
-    const iconClass = `jp-SettingEditorInstructions-icon jp-JupyterIcon`;
-
+  export function populateInstructionsNode(
+    node: HTMLElement,
+    translator?: ITranslator
+  ): void {
+    translator = translator || nullTranslator;
+    const trans = translator.load('jupyterlab');
     ReactDOM.render(
       <React.Fragment>
         <h2>
-          <span className={iconClass} />
+          <jupyterIcon.react
+            className="jp-SettingEditorInstructions-icon"
+            tag="span"
+            elementPosition="center"
+            height="auto"
+            width="60px"
+          />
           <span className="jp-SettingEditorInstructions-title">Settings</span>
         </h2>
         <span className="jp-SettingEditorInstructions-text">
-          Select a plugin from the list to view and edit its preferences.
+          {trans.__(
+            'Select a plugin from the list to view and edit its preferences.'
+          )}
         </span>
       </React.Fragment>,
       node

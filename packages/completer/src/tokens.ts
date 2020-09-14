@@ -3,13 +3,14 @@
 
 import { CodeEditor } from '@jupyterlab/codeeditor';
 
-import { IDataConnector } from '@jupyterlab/coreutils';
+import { IDataConnector } from '@jupyterlab/statedb';
 
-import { Token } from '@phosphor/coreutils';
+import { Token } from '@lumino/coreutils';
 
-import { Widget } from '@phosphor/widgets';
+import { Widget } from '@lumino/widgets';
 
 import { CompletionHandler } from './handler';
+import { Completer } from './widget';
 
 /* tslint:disable */
 /**
@@ -30,7 +31,8 @@ export interface ICompletionManager {
    * @returns A completable object whose attributes can be updated as necessary.
    */
   register(
-    completable: ICompletionManager.ICompletable
+    completable: ICompletionManager.ICompletable,
+    renderer?: Completer.IRenderer
   ): ICompletionManager.ICompletableAttributes;
 }
 
@@ -49,12 +51,15 @@ export namespace ICompletionManager {
 
     /**
      * The data connector used to populate the completer.
+     * Use the connector with ICompletionItemsReply for enhanced completions.
      */
-    connector: IDataConnector<
-      CompletionHandler.IReply,
-      void,
-      CompletionHandler.IRequest
-    >;
+    connector:
+      | IDataConnector<
+          CompletionHandler.IReply,
+          void,
+          CompletionHandler.IRequest
+        >
+      | CompletionHandler.ICompletionItemsConnector;
   }
 
   /**

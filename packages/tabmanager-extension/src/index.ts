@@ -1,44 +1,47 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
+import { each } from '@lumino/algorithm';
+import { Widget } from '@lumino/widgets';
+
 import {
   ILabShell,
   ILayoutRestorer,
   JupyterFrontEnd,
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
-
-import { TabBarSvg } from '@jupyterlab/ui-components';
-
-import { each } from '@phosphor/algorithm';
-
-import { Widget } from '@phosphor/widgets';
+import { ITranslator } from '@jupyterlab/translation';
+import { TabBarSvg, tabIcon } from '@jupyterlab/ui-components';
 
 /**
  * The default tab manager extension.
  */
 const plugin: JupyterFrontEndPlugin<void> = {
   id: '@jupyterlab/tabmanager-extension:plugin',
+  autoStart: true,
+  requires: [ITranslator],
+  optional: [ILabShell, ILayoutRestorer],
   activate: (
     app: JupyterFrontEnd,
+    translator: ITranslator,
     labShell: ILabShell | null,
     restorer: ILayoutRestorer | null
   ): void => {
+    const trans = translator.load('jupyterlab');
     const { shell } = app;
-    const tabs = new TabBarSvg<Widget>({
-      kind: 'tabManager',
-      orientation: 'vertical'
-    });
+    const tabs = new TabBarSvg<Widget>({ orientation: 'vertical' });
     const header = document.createElement('header');
 
     if (restorer) {
       restorer.add(tabs, 'tab-manager');
     }
 
+    const content = trans.__('Open Tabs');
+
     tabs.id = 'tab-manager';
-    tabs.title.iconClass = 'jp-TabIcon jp-SideBar-tabIcon';
-    tabs.title.caption = 'Open Tabs';
-    header.textContent = 'Open Tabs';
+    tabs.title.caption = content;
+    tabs.title.icon = tabIcon;
+    header.textContent = content;
     tabs.node.insertBefore(header, tabs.contentNode);
     shell.add(tabs, 'left', { rank: 600 });
 
@@ -69,9 +72,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
       // Populate the tab manager.
       populate();
     });
-  },
-  autoStart: true,
-  optional: [ILabShell, ILayoutRestorer]
+  }
 };
 
 /**

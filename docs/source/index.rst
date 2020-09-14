@@ -40,10 +40,10 @@ JupyterLab is the next-generation web-based user interface for Project Jupyter. 
    user/commands
    user/documents_kernels
    user/file_formats
+   user/debugger
    user/extensions
    user/jupyterhub
    user/export
-
 
 .. toctree::
    :maxdepth: 1
@@ -53,19 +53,15 @@ JupyterLab is the next-generation web-based user interface for Project Jupyter. 
    developer/extension_dev
    developer/extension_points
    developer/contributing
+   developer/components
+   developer/ui_components
    developer/documents
    developer/notebook
    developer/patterns
    developer/css
    developer/virtualdom
-   developer/examples
    developer/ui_helpers
    developer/terminology
    developer/extension_tutorial
+   developer/extension_migration
 
-Indices and Tables
-------------------
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`

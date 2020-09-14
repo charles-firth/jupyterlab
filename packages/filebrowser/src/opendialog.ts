@@ -1,18 +1,18 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { toArray } from '@phosphor/algorithm';
-import { PanelLayout, Widget } from '@phosphor/widgets';
+import { toArray } from '@lumino/algorithm';
+import { PanelLayout, Widget } from '@lumino/widgets';
 import { PathExt } from '@jupyterlab/coreutils';
 
 import { Dialog } from '@jupyterlab/apputils';
 import { IDocumentManager } from '@jupyterlab/docmanager';
 import { Contents } from '@jupyterlab/services';
-import { IIconRegistry } from '@jupyterlab/ui-components';
 
 import { FileBrowser } from './browser';
 import { FilterFileBrowserModel } from './model';
 import { IFileBrowserFactory } from './tokens';
+import { nullTranslator, ITranslator } from '@jupyterlab/translation';
 
 /**
  * The class name added to open file dialog
@@ -37,14 +37,14 @@ export namespace FileDialog {
       >
     > {
     /**
-     * An icon registry instance.
-     */
-    iconRegistry: IIconRegistry;
-
-    /**
      * Document manager
      */
     manager: IDocumentManager;
+
+    /**
+     * The application language translator.
+     */
+    translator?: ITranslator;
   }
 
   /**
@@ -55,6 +55,11 @@ export namespace FileDialog {
      * Filter function on file browser item model
      */
     filter?: (value: Contents.IModel) => boolean;
+
+    /**
+     * The application language translator.
+     */
+    translator?: ITranslator;
   }
 
   /**
@@ -70,24 +75,22 @@ export namespace FileDialog {
   export function getOpenFiles(
     options: IFileOptions
   ): Promise<Dialog.IResult<Contents.IModel[]>> {
-    let dialogOptions: Partial<Dialog.IOptions<Contents.IModel[]>> = {
+    const translator = options.translator || nullTranslator;
+    const trans = translator.load('jupyterlab');
+    const dialogOptions: Partial<Dialog.IOptions<Contents.IModel[]>> = {
       title: options.title,
       buttons: [
-        Dialog.cancelButton(),
+        Dialog.cancelButton({ label: trans.__('Cancel') }),
         Dialog.okButton({
-          label: 'Select'
+          label: trans.__('Select')
         })
       ],
       focusNodeSelector: options.focusNodeSelector,
       host: options.host,
       renderer: options.renderer,
-      body: new OpenDialog(
-        options.iconRegistry,
-        options.manager,
-        options.filter
-      )
+      body: new OpenDialog(options.manager, options.filter, translator)
     };
-    let dialog = new Dialog(dialogOptions);
+    const dialog = new Dialog(dialogOptions);
     return dialog.launch();
   }
 
@@ -114,25 +117,28 @@ export namespace FileDialog {
 /**
  * Open dialog widget
  */
-class OpenDialog extends Widget
+class OpenDialog
+  extends Widget
   implements Dialog.IBodyWidget<Contents.IModel[]> {
   constructor(
-    iconRegistry: IIconRegistry,
     manager: IDocumentManager,
-    filter?: (value: Contents.IModel) => boolean
+    filter?: (value: Contents.IModel) => boolean,
+    translator?: ITranslator
   ) {
     super();
+    translator = translator || nullTranslator;
     this.addClass(OPEN_DIALOG_CLASS);
 
     this._browser = Private.createFilteredFileBrowser(
       'filtered-file-browser-dialog',
-      iconRegistry,
       manager,
-      filter
+      filter,
+      {},
+      translator
     );
 
     // Build the sub widgets
-    let layout = new PanelLayout();
+    const layout = new PanelLayout();
     layout.addWidget(this._browser);
 
     // Set Widget content
@@ -173,8 +179,6 @@ namespace Private {
    *
    * @param id - The widget/DOM id of the file browser.
    *
-   * @param iconRegistry - An icon registry instance.
-   *
    * @param manager - A document manager instance.
    *
    * @param filter - function to filter file browser item.
@@ -194,21 +198,23 @@ namespace Private {
    */
   export const createFilteredFileBrowser = (
     id: string,
-    iconRegistry: IIconRegistry,
     manager: IDocumentManager,
     filter?: (value: Contents.IModel) => boolean,
-    options: IFileBrowserFactory.IOptions = {}
+    options: IFileBrowserFactory.IOptions = {},
+    translator?: ITranslator
   ) => {
+    translator = translator || nullTranslator;
     const model = new FilterFileBrowserModel({
-      iconRegistry,
       manager,
       filter,
+      translator,
       driveName: options.driveName,
       refreshInterval: options.refreshInterval
     });
     const widget = new FileBrowser({
       id,
-      model
+      model,
+      translator
     });
 
     return widget;

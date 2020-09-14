@@ -1,21 +1,19 @@
-/*-----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
 | Copyright (c) Jupyter Development Team.
 | Distributed under the terms of the Modified BSD License.
 |----------------------------------------------------------------------------*/
 
-import { ISettingRegistry } from '@jupyterlab/coreutils';
+import { ISettingRegistry } from '@jupyterlab/settingregistry';
 
-import {
-  combineClasses,
-  DefaultIconReact,
-  defaultIconRegistry
-} from '@jupyterlab/ui-components';
+import { nullTranslator, ITranslator } from '@jupyterlab/translation';
 
-import { Message } from '@phosphor/messaging';
+import { classes, LabIcon, settingsIcon } from '@jupyterlab/ui-components';
 
-import { ISignal, Signal } from '@phosphor/signaling';
+import { Message } from '@lumino/messaging';
 
-import { Widget } from '@phosphor/widgets';
+import { ISignal, Signal } from '@lumino/signaling';
+
+import { Widget } from '@lumino/widgets';
 
 import * as React from 'react';
 
@@ -31,6 +29,7 @@ export class PluginList extends Widget {
   constructor(options: PluginList.IOptions) {
     super();
     this.registry = options.registry;
+    this.translator = options.translator || nullTranslator;
     this.addClass('jp-PluginList');
     this._confirm = options.confirm;
     this.registry.pluginChanged.connect(() => {
@@ -53,8 +52,8 @@ export class PluginList extends Widget {
   /**
    * The selection value of the plugin list.
    */
-  get scrollTop(): number {
-    return this.node.querySelector('ul').scrollTop;
+  get scrollTop(): number | undefined {
+    return this.node.querySelector('ul')?.scrollTop;
   }
 
   /**
@@ -112,9 +111,13 @@ export class PluginList extends Widget {
   protected onUpdateRequest(msg: Message): void {
     const { node, registry } = this;
     const selection = this._selection;
+    const translation = this.translator;
 
-    Private.populateList(registry, selection, node);
-    node.querySelector('ul').scrollTop = this._scrollTop;
+    Private.populateList(registry, selection, node, translation);
+    const ul = node.querySelector('ul');
+    if (ul && this._scrollTop !== undefined) {
+      ul.scrollTop = this._scrollTop;
+    }
   }
 
   /**
@@ -146,7 +149,7 @@ export class PluginList extends Widget {
     this._confirm()
       .then(() => {
         this._scrollTop = this.scrollTop;
-        this._selection = id;
+        this._selection = id!;
         this._changed.emit(undefined);
         this.update();
       })
@@ -155,9 +158,10 @@ export class PluginList extends Widget {
       });
   }
 
+  protected translator: ITranslator;
   private _changed = new Signal<this, void>(this);
   private _confirm: () => Promise<void>;
-  private _scrollTop = 0;
+  private _scrollTop: number | undefined = 0;
   private _selection = '';
 }
 
@@ -183,6 +187,11 @@ export namespace PluginList {
      * The setting registry for the plugin list.
      */
     registry: ISettingRegistry;
+
+    /**
+     * The setting registry for the plugin list.
+     */
+    translator?: ITranslator;
   }
 }
 
@@ -191,12 +200,20 @@ export namespace PluginList {
  */
 namespace Private {
   /**
-   * The JupyterLab plugin schema key for the setting editor icon of a plugin.
+   * The JupyterLab plugin schema key for the setting editor
+   * icon class of a plugin.
+   */
+  const ICON_KEY = 'jupyter.lab.setting-icon';
+
+  /**
+   * The JupyterLab plugin schema key for the setting editor
+   * icon class of a plugin.
    */
   const ICON_CLASS_KEY = 'jupyter.lab.setting-icon-class';
 
   /**
-   * The JupyterLab plugin schema key for the setting editor label of a plugin.
+   * The JupyterLab plugin schema key for the setting editor
+   * icon label of a plugin.
    */
   const ICON_LABEL_KEY = 'jupyter.lab.setting-icon-label';
 
@@ -245,8 +262,11 @@ namespace Private {
   export function populateList(
     registry: ISettingRegistry,
     selection: string,
-    node: HTMLElement
+    node: HTMLElement,
+    translator?: ITranslator
   ): void {
+    translator = translator || nullTranslator;
+    const trans = translator.load('jupyterlab');
     const plugins = sortPlugins(registry).filter(plugin => {
       const { schema } = plugin;
       const deprecated = schema['jupyter.lab.setting-deprecated'] === true;
@@ -257,13 +277,17 @@ namespace Private {
     });
     const items = plugins.map(plugin => {
       const { id, schema, version } = plugin;
-      const itemTitle = `${schema.description}\n${id}\n${version}`;
-      const image = getHint(ICON_CLASS_KEY, registry, plugin);
-      const iconClass = combineClasses(
-        image,
-        'jp-PluginList-icon',
-        'jp-MaterialIcon'
-      );
+      const title =
+        typeof schema.title === 'string'
+          ? trans._p('schema', schema.title)
+          : id;
+      const description =
+        typeof schema.description === 'string'
+          ? trans._p('schema', schema.description)
+          : '';
+      const itemTitle = `${description}\n${id}\n${version}`;
+      const icon = getHint(ICON_KEY, registry, plugin);
+      const iconClass = getHint(ICON_CLASS_KEY, registry, plugin);
       const iconTitle = getHint(ICON_LABEL_KEY, registry, plugin);
 
       return (
@@ -273,18 +297,14 @@ namespace Private {
           key={id}
           title={itemTitle}
         >
-          {defaultIconRegistry.contains(image) ? (
-            <DefaultIconReact
-              name={image}
-              title={iconTitle}
-              className={''}
-              tag={'span'}
-              kind={'settingsEditor'}
-            />
-          ) : (
-            <span className={iconClass} title={iconTitle} />
-          )}
-          <span>{schema.title || id}</span>
+          <LabIcon.resolveReact
+            icon={icon || (iconClass ? undefined : settingsIcon)}
+            iconClass={classes(iconClass, 'jp-Icon')}
+            title={iconTitle}
+            tag="span"
+            stylesheet="settingsEditor"
+          />
+          <span>{title}</span>
         </li>
       );
     });
@@ -298,7 +318,7 @@ namespace Private {
    */
   function sortPlugins(registry: ISettingRegistry): ISettingRegistry.IPlugin[] {
     return Object.keys(registry.plugins)
-      .map(plugin => registry.plugins[plugin])
+      .map(plugin => registry.plugins[plugin]!)
       .sort((a, b) => {
         return (a.schema.title || a.id).localeCompare(b.schema.title || b.id);
       });

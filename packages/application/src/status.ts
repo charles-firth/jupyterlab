@@ -1,11 +1,11 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { Token } from '@phosphor/coreutils';
+import { Token } from '@lumino/coreutils';
 
-import { DisposableDelegate, IDisposable } from '@phosphor/disposable';
+import { DisposableDelegate, IDisposable } from '@lumino/disposable';
 
-import { ISignal, Signal } from '@phosphor/signaling';
+import { ISignal, Signal } from '@lumino/signaling';
 
 import { JupyterFrontEnd } from './frontend';
 
@@ -25,12 +25,12 @@ export interface ILabStatus {
   /**
    * A signal for when application changes its busy status.
    */
-  readonly busySignal: ISignal<JupyterFrontEnd, boolean>;
+  readonly busySignal: ISignal<JupyterFrontEnd<any, any>, boolean>;
 
   /**
    * A signal for when application changes its dirty status.
    */
-  readonly dirtySignal: ISignal<JupyterFrontEnd, boolean>;
+  readonly dirtySignal: ISignal<JupyterFrontEnd<any, any>, boolean>;
 
   /**
    * Whether the application is busy.
@@ -64,7 +64,7 @@ export class LabStatus implements ILabStatus {
   /**
    * Construct a new  status object.
    */
-  constructor(app: JupyterFrontEnd) {
+  constructor(app: JupyterFrontEnd<any, any>) {
     this._busySignal = new Signal(app);
     this._dirtySignal = new Signal(app);
   }

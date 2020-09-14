@@ -25,6 +25,12 @@
       "path": "../cells"
     },
     {
+      "path": "../celltags"
+    },
+    {
+      "path": "../celltags-extension"
+    },
+    {
       "path": "../codeeditor"
     },
     {
@@ -53,6 +59,12 @@
     },
     {
       "path": "../csvviewer-extension"
+    },
+    {
+      "path": "../debugger"
+    },
+    {
+      "path": "../debugger-extension"
     },
     {
       "path": "../docmanager"
@@ -148,6 +160,9 @@
       "path": "../mathjax2-extension"
     },
     {
+      "path": "../nbformat"
+    },
+    {
       "path": "../notebook"
     },
     {
@@ -161,6 +176,9 @@
     },
     {
       "path": "../pdf-extension"
+    },
+    {
+      "path": "../property-inspector"
     },
     {
       "path": "../rendermime"
@@ -187,7 +205,13 @@
       "path": "../settingeditor-extension"
     },
     {
+      "path": "../settingregistry"
+    },
+    {
       "path": "../shortcuts-extension"
+    },
+    {
+      "path": "../statedb"
     },
     {
       "path": "../statusbar"
@@ -211,10 +235,22 @@
       "path": "../theme-light-extension"
     },
     {
+      "path": "../toc"
+    },
+    {
+      "path": "../toc-extension"
+    },
+    {
       "path": "../tooltip"
     },
     {
       "path": "../tooltip-extension"
+    },
+    {
+      "path": "../translation"
+    },
+    {
+      "path": "../translation-extension"
     },
     {
       "path": "../ui-components"
@@ -227,9 +263,6 @@
     },
     {
       "path": "../vdom-extension"
-    },
-    {
-      "path": "../vega4-extension"
     },
     {
       "path": "../vega5-extension"

@@ -28,7 +28,13 @@
       "path": "../services"
     },
     {
+      "path": "../settingregistry"
+    },
+    {
       "path": "../statusbar"
+    },
+    {
+      "path": "../translation"
     }
   ]
 }

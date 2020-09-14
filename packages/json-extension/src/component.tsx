@@ -7,16 +7,22 @@ import Highlight from 'react-highlighter';
 
 import JSONTree from 'react-json-tree';
 
-import { JSONArray, JSONObject, JSONValue } from '@phosphor/coreutils';
+import { JSONArray, JSONObject, JSONValue, JSONExt } from '@lumino/coreutils';
 
 import { InputGroup } from '@jupyterlab/ui-components';
+import { nullTranslator, ITranslator } from '@jupyterlab/translation';
 
 /**
  * The properties for the JSON tree component.
  */
 export interface IProps {
-  data: JSONValue;
+  data: NonNullable<JSONValue>;
   metadata?: JSONObject;
+
+  /**
+   * The application language translator.
+   */
+  translator?: ITranslator;
 }
 
 /**
@@ -45,6 +51,9 @@ export class Component extends React.Component<IProps, IState> {
   };
 
   render() {
+    const translator = this.props.translator || nullTranslator;
+    const trans = translator.load('jupyterlab');
+
     const { data, metadata } = this.props;
     const root = metadata && metadata.root ? (metadata.root as string) : 'root';
     const keyPaths = this.state.filter
@@ -55,10 +64,10 @@ export class Component extends React.Component<IProps, IState> {
         <InputGroup
           className="filter"
           type="text"
-          placeholder="Filter..."
+          placeholder={trans.__('Filter...')}
           onChange={this.handleChange}
           value={this.state.value}
-          rightIcon="search"
+          rightIcon="ui-components:search"
         />
         <JSONTree
           data={data}
@@ -80,7 +89,9 @@ export class Component extends React.Component<IProps, IState> {
             ) : Object.keys(data).length === 0 ? (
               // Only display object type when it's empty i.e. "{}".
               <span>{itemType}</span>
-            ) : null
+            ) : (
+              null! // Upstream typings don't accept null, but it should be ok
+            )
           }
           labelRenderer={([label, type]) => {
             // let className = 'cm-variable';
@@ -161,11 +172,11 @@ function objectIncludes(data: JSONValue, query: string): boolean {
 }
 
 function filterPaths(
-  data: JSONValue,
+  data: NonNullable<JSONValue>,
   query: string,
   parent: JSONArray = ['root']
 ): JSONArray {
-  if (Array.isArray(data)) {
+  if (JSONExt.isArray(data)) {
     return data.reduce((result: JSONArray, item: JSONValue, index: number) => {
       if (item && typeof item === 'object' && objectIncludes(item, query)) {
         return [
@@ -177,9 +188,9 @@ function filterPaths(
       return result;
     }, []) as JSONArray;
   }
-  if (typeof data === 'object') {
+  if (JSONExt.isObject(data)) {
     return Object.keys(data).reduce((result: JSONArray, key: string) => {
-      let item = data[key];
+      const item = data[key];
       if (
         item &&
         typeof item === 'object' &&
@@ -194,4 +205,5 @@ function filterPaths(
       return result;
     }, []);
   }
+  return [];
 }

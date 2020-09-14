@@ -1,4 +1,4 @@
-/*-----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
 | Copyright (c) Jupyter Development Team.
 | Distributed under the terms of the Modified BSD License.
 |----------------------------------------------------------------------------*/
@@ -16,6 +16,7 @@ import {
   RenderMimeRegistry,
   standardRendererFactories
 } from '@jupyterlab/rendermime';
+import { ITranslator } from '@jupyterlab/translation';
 
 namespace CommandIDs {
   export const handleLink = 'rendermime:handle-local-link';
@@ -26,7 +27,7 @@ namespace CommandIDs {
  */
 const plugin: JupyterFrontEndPlugin<IRenderMimeRegistry> = {
   id: '@jupyterlab/rendermime-extension:plugin',
-  requires: [],
+  requires: [ITranslator],
   optional: [IDocumentManager, ILatexTypesetter],
   provides: IRenderMimeRegistry,
   activate: activate,
@@ -43,12 +44,14 @@ export default plugin;
  */
 function activate(
   app: JupyterFrontEnd,
+  translator: ITranslator,
   docManager: IDocumentManager | null,
   latexTypesetter: ILatexTypesetter | null
 ) {
+  const trans = translator.load('jupyterlab');
   if (docManager) {
     app.commands.addCommand(CommandIDs.handleLink, {
-      label: 'Handle Local Link',
+      label: trans.__('Handle Local Link'),
       execute: args => {
         const path = args['path'] as string | undefined | null;
         const id = args['id'] as string | undefined | null;
@@ -77,7 +80,7 @@ function activate(
   return new RenderMimeRegistry({
     initialFactories: standardRendererFactories,
     linkHandler: !docManager
-      ? null
+      ? undefined
       : {
           handleLink: (node: HTMLElement, path: string, id?: string) => {
             // If node has the download attribute explicitly set, use the
@@ -91,6 +94,7 @@ function activate(
             });
           }
         },
-    latexTypesetter
+    latexTypesetter: latexTypesetter ?? undefined,
+    translator: translator
   });
 }

@@ -1,4 +1,4 @@
-/*-----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
 | Copyright (c) Jupyter Development Team.
 | Distributed under the terms of the Modified BSD License.
 |----------------------------------------------------------------------------*/
@@ -19,10 +19,9 @@ import {
   IHTMLViewerTracker
 } from '@jupyterlab/htmlviewer';
 
-/**
- * The name for an HTML5 icon.
- */
-const ICON_NAME = 'html5';
+import { ITranslator } from '@jupyterlab/translation';
+
+import { html5Icon } from '@jupyterlab/ui-components';
 
 /**
  * Command IDs used by the plugin.
@@ -38,6 +37,7 @@ const htmlPlugin: JupyterFrontEndPlugin<IHTMLViewerTracker> = {
   activate: activateHTMLViewer,
   id: '@jupyterlab/htmlviewer-extension:plugin',
   provides: IHTMLViewerTracker,
+  requires: [ITranslator],
   optional: [ICommandPalette, ILayoutRestorer],
   autoStart: true
 };
@@ -47,24 +47,26 @@ const htmlPlugin: JupyterFrontEndPlugin<IHTMLViewerTracker> = {
  */
 function activateHTMLViewer(
   app: JupyterFrontEnd,
+  translator: ITranslator,
   palette: ICommandPalette | null,
   restorer: ILayoutRestorer | null
 ): IHTMLViewerTracker {
   // Add an HTML file type to the docregistry.
+  const trans = translator.load('jupyterlab');
   const ft: DocumentRegistry.IFileType = {
     name: 'html',
     contentType: 'file',
     fileFormat: 'text',
-    displayName: 'HTML File',
+    displayName: trans.__('HTML File'),
     extensions: ['.html'],
     mimeTypes: ['text/html'],
-    iconClass: ICON_NAME
+    icon: html5Icon
   };
   app.docRegistry.addFileType(ft);
 
   // Create a new viewer factory.
   const factory = new HTMLViewerFactory({
-    name: 'HTML Viewer',
+    name: trans.__('HTML Viewer'),
     fileTypes: ['html'],
     defaultFor: ['html'],
     readOnly: true
@@ -98,15 +100,15 @@ function activateHTMLViewer(
       app.commands.notifyCommandChanged(CommandIDs.trustHTML);
     });
 
-    // widget.node.appendChild(HTML5Icon);
-    widget.title.iconClass = ft.iconClass;
-    widget.title.iconLabel = ft.iconLabel;
+    widget.title.icon = ft.icon!;
+    widget.title.iconClass = ft.iconClass ?? '';
+    widget.title.iconLabel = ft.iconLabel ?? '';
   });
 
   // Add a command to trust the active HTML document,
   // allowing script executions in its context.
   app.commands.addCommand(CommandIDs.trustHTML, {
-    label: 'Trust HTML File',
+    label: trans.__('Trust HTML File'),
     isEnabled: () => !!tracker.currentWidget,
     isToggled: () => {
       const current = tracker.currentWidget;
@@ -127,7 +129,7 @@ function activateHTMLViewer(
   if (palette) {
     palette.addItem({
       command: CommandIDs.trustHTML,
-      category: 'File Operations'
+      category: trans.__('File Operations')
     });
   }
 

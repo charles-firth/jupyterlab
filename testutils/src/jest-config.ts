@@ -1,28 +1,29 @@
 import path = require('path');
 
-module.exports = function(name: string, baseDir: string) {
+module.exports = function (baseDir: string) {
   return {
     preset: 'ts-jest/presets/js-with-babel',
     moduleNameMapper: {
+      '^!!to-string-loader!css-loader!.+\\.css':
+        '@jupyterlab/testutils/lib/jest-style-mock.js',
       '\\.(css|less|sass|scss)$': 'identity-obj-proxy',
-      '\\.(gif|ttf|eot|svg)$': '@jupyterlab/testutils/lib/jest-file-mock.js'
+      '\\.(gif|ttf|eot)$': '@jupyterlab/testutils/lib/jest-file-mock.js'
     },
-    setupFilesAfterEnv: ['@jupyterlab/testutils/lib/jest-script.js'],
+    transform: {
+      '\\.svg$': 'jest-raw-loader',
+      '^.+\\.md?$': 'markdown-loader-jest'
+    },
+    testTimeout: 10000,
     setupFiles: ['@jupyterlab/testutils/lib/jest-shim.js'],
-    testPathIgnorePatterns: ['/dev_mode/', '/lib/', '/node_modules/'],
+    testPathIgnorePatterns: ['/lib/', '/node_modules/'],
     moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-    rootDir: path.resolve(path.join(baseDir, '..', '..')),
-    reporters: ['default', 'jest-junit'],
-    collectCoverageFrom: [
-      `packages/${name}/src/**.{ts,tsx}`,
-      `!packages/${name}/src/*.d.ts`
-    ],
+    reporters: ['default', 'jest-junit', 'jest-summary-reporter'],
     coverageReporters: ['json', 'lcov', 'text', 'html'],
     coverageDirectory: path.join(baseDir, 'coverage'),
-    testRegex: `tests\/test-${name}\/src\/.*\.spec\.tsx?$`,
+    testRegex: '/test/.*.spec.ts[x]?$',
     globals: {
       'ts-jest': {
-        tsConfig: `./tsconfig.json`
+        tsConfig: `./tsconfig.test.json`
       }
     }
   };

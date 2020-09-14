@@ -13,6 +13,15 @@
       "path": "../services"
     },
     {
+      "path": "../settingregistry"
+    },
+    {
+      "path": "../statedb"
+    },
+    {
+      "path": "../translation"
+    },
+    {
       "path": "../ui-components"
     }
   ]

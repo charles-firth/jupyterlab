@@ -5,15 +5,18 @@ import { IRenderMime } from '@jupyterlab/rendermime-interfaces';
 
 import { Printing } from '@jupyterlab/apputils';
 
-import { Message } from '@phosphor/messaging';
+import { nullTranslator, ITranslator } from '@jupyterlab/translation';
 
-import { Widget } from '@phosphor/widgets';
+import { Message } from '@lumino/messaging';
+
+import { Widget } from '@lumino/widgets';
 
 import * as React from 'react';
 
 import * as ReactDOM from 'react-dom';
 
 import { Component } from './component';
+import { JSONValue, JSONObject } from '@lumino/coreutils';
 
 /**
  * The CSS class to add to the JSON Widget.
@@ -28,7 +31,8 @@ export const MIME_TYPE = 'application/json';
 /**
  * A renderer for JSON data.
  */
-export class RenderedJSON extends Widget
+export class RenderedJSON
+  extends Widget
   implements IRenderMime.IRenderer, Printing.IPrintable {
   /**
    * Create a new widget for rendering JSON.
@@ -39,6 +43,7 @@ export class RenderedJSON extends Widget
     this.addClass('CodeMirror');
     this.addClass('cm-s-jupyter');
     this._mimeType = options.mimeType;
+    this.translator = options.translator || nullTranslator;
   }
 
   [Printing.symbol]() {
@@ -49,11 +54,15 @@ export class RenderedJSON extends Widget
    * Render JSON into this widget's node.
    */
   renderModel(model: IRenderMime.IMimeModel): Promise<void> {
-    const data = model.data[this._mimeType] as any;
-    const metadata = (model.metadata[this._mimeType] as any) || {};
+    const data = (model.data[this._mimeType] || {}) as NonNullable<JSONValue>;
+    const metadata = (model.metadata[this._mimeType] || {}) as JSONObject;
     return new Promise<void>((resolve, reject) => {
       ReactDOM.render(
-        <Component data={data} metadata={metadata} />,
+        <Component
+          data={data}
+          metadata={metadata}
+          translator={this.translator}
+        />,
         this.node,
         () => {
           resolve();
@@ -70,6 +79,7 @@ export class RenderedJSON extends Widget
     ReactDOM.unmountComponentAtNode(this.node);
   }
 
+  translator: ITranslator;
   private _mimeType: string;
 }
 

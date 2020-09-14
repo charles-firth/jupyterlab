@@ -17,6 +17,12 @@
     },
     {
       "path": "../htmlviewer"
+    },
+    {
+      "path": "../translation"
+    },
+    {
+      "path": "../ui-components"
     }
   ]
 }

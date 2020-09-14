@@ -1,15 +1,17 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { CommandRegistry } from '@phosphor/commands';
+import { CommandRegistry } from '@lumino/commands';
 
 import { ServerConnection, ServiceManager } from '@jupyterlab/services';
 
-import { ReadonlyJSONObject, Token } from '@phosphor/coreutils';
+import { ITranslator } from '@jupyterlab/translation';
 
-import { IDisposable } from '@phosphor/disposable';
+import { Token, ReadonlyPartialJSONObject } from '@lumino/coreutils';
 
-import { ISignal } from '@phosphor/signaling';
+import { IDisposable } from '@lumino/disposable';
+
+import { ISignal } from '@lumino/signaling';
 
 /**
  * A token for which a plugin can provide to respond to connection failures
@@ -29,7 +31,8 @@ export const IConnectionLost = new Token<IConnectionLost>(
  */
 export type IConnectionLost = (
   manager: ServiceManager.IManager,
-  err: ServerConnection.NetworkError
+  err: ServerConnection.NetworkError,
+  translator?: ITranslator
 ) => Promise<void>;
 
 /**
@@ -109,7 +112,7 @@ export namespace IRouter {
   /**
    * The parsed location currently being routed.
    */
-  export interface ILocation extends ReadonlyJSONObject {
+  export interface ILocation extends ReadonlyPartialJSONObject {
     /**
      * The location hash.
      */
@@ -132,7 +135,7 @@ export namespace IRouter {
      * The search element, including leading question mark (`'?'`), if any,
      * of the path.
      */
-    search: string;
+    search?: string;
   }
 
   /**
@@ -144,6 +147,12 @@ export namespace IRouter {
      * history API change.
      */
     hard?: boolean;
+
+    /**
+     * Should the routing stage be skipped when navigating? This will simply rewrite the URL
+     * and push the new state to the history API, no routing commands will be triggered.
+     */
+    skipRouting?: boolean;
   }
 
   /**

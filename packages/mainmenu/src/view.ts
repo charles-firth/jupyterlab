@@ -1,7 +1,7 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { Menu, Widget } from '@phosphor/widgets';
+import { Menu, Widget } from '@lumino/widgets';
 
 import { IJupyterLabMenu, IMenuExtender, JupyterLabMenu } from './labmenu';
 
@@ -24,8 +24,6 @@ export class ViewMenu extends JupyterLabMenu implements IViewMenu {
    */
   constructor(options: Menu.IOptions) {
     super(options);
-    this.menu.title.label = 'View';
-
     this.editorViewers = new Set<IViewMenu.IEditorViewer<Widget>>();
   }
 

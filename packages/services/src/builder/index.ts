@@ -19,7 +19,7 @@ export class BuildManager {
    */
   constructor(options: BuildManager.IOptions = {}) {
     this.serverSettings =
-      options.serverSettings || ServerConnection.makeSettings();
+      options.serverSettings ?? ServerConnection.makeSettings();
     const { baseUrl, appUrl } = this.serverSettings;
     this._url = URLExt.join(baseUrl, appUrl, BUILD_SETTINGS_URL);
   }
@@ -82,7 +82,7 @@ export class BuildManager {
         throw new ServerConnection.ResponseError(response, 'Build aborted');
       }
       if (response.status !== 200) {
-        let message = `Build failed with ${response.status}, please run 'jupyter lab build' on the server for full output`;
+        const message = `Build failed with ${response.status}, please run 'jupyter lab build' on the server for full output`;
         throw new ServerConnection.ResponseError(response, message);
       }
     });

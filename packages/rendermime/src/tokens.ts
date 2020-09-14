@@ -1,15 +1,16 @@
-/*-----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
 | Copyright (c) Jupyter Development Team.
 | Distributed under the terms of the Modified BSD License.
 |----------------------------------------------------------------------------*/
 
-import { Token, ReadonlyJSONObject } from '@phosphor/coreutils';
+import { Token, ReadonlyPartialJSONObject } from '@lumino/coreutils';
 
 import { ISanitizer } from '@jupyterlab/apputils';
 
 import { IRenderMime } from '@jupyterlab/rendermime-interfaces';
 
 import { MimeModel } from './mimemodel';
+import { ITranslator } from '@jupyterlab/translation';
 
 /* tslint:disable */
 /**
@@ -59,7 +60,7 @@ export interface IRenderMimeRegistry {
    *   or `undefined` if the mime type cannot be rendered.
    */
   preferredMimeType(
-    bundle: ReadonlyJSONObject,
+    bundle: ReadonlyPartialJSONObject,
     safe?: 'ensure' | 'prefer' | 'any'
   ): string | undefined;
 
@@ -170,6 +171,11 @@ export namespace IRenderMimeRegistry {
      * The new LaTeX typesetter.
      */
     latexTypesetter?: IRenderMime.ILatexTypesetter;
+
+    /**
+     * The application language translator.
+     */
+    translator?: ITranslator;
   }
 }
 

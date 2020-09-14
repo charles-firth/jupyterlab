@@ -19,16 +19,14 @@ from unittest import TestCase
 from unittest.mock import patch
 
 import pytest
-from notebook.notebookapp import NotebookApp
 from jupyter_core import paths
 
 from jupyterlab import commands
-from jupyterlab.extension import load_jupyter_server_extension
 from jupyterlab.commands import (
     install_extension, uninstall_extension, list_extensions,
     build, link_package, unlink_package, build_check,
     disable_extension, enable_extension, get_app_info,
-    check_extension, _test_overlap, update_extension,
+    check_extension, _test_overlap, _compare_ranges, update_extension,
     AppOptions
 )
 from jupyterlab.coreconfig import CoreConfig, _get_default_core_data
@@ -51,6 +49,12 @@ def touch(file, mtime=None):
         os.utime(file, (atime, mtime))
     return os.stat(file).st_mtime
 
+
+# @pytest.fixture()
+# def resource():
+#     print("setup")
+#     yield "resource"
+#    print("teardown")
 
 class AppHandlerTest(TestCase):
 
@@ -91,7 +95,8 @@ class AppHandlerTest(TestCase):
             shutil.copytree(src, dest, ignore=ignore)
 
             # Make a node modules folder so npm install is not called.
-            os.makedirs(pjoin(dest, 'node_modules'))
+            if not os.path.exists(pjoin(dest, 'node_modules')):
+                os.makedirs(pjoin(dest, 'node_modules'))
 
             setattr(self, 'mock_' + name, dest)
             with open(pjoin(dest, 'package.json')) as fid:
@@ -280,7 +285,7 @@ class TestExtension(AppHandlerTest):
                 stdout=subprocess.PIPE,
                 universal_newlines=True,
                 check=True,
-                cwd=base_dir
+                cwd=str(base_dir)
             ).stdout.strip()
             for name in self.pinned_packages
         ]
@@ -505,7 +510,7 @@ class TestExtension(AppHandlerTest):
         pkg = pjoin(app_dir, 'static', 'package.json')
         with open(pkg) as fid:
             data = json.load(fid)
-        assert list(data['jupyterlab']['extensions'].keys()) == [
+        assert sorted(data['jupyterlab']['extensions'].keys()) == [
             '@jupyterlab/application-extension',
             '@jupyterlab/apputils-extension',
             '@jupyterlab/mock-extension',
@@ -514,14 +519,6 @@ class TestExtension(AppHandlerTest):
         for pkg in data['jupyterlab']['singletonPackages']:
             if pkg.startswith('@jupyterlab/'):
                 assert pkg in singletons
-
-    def test_load_extension(self):
-        app = NotebookApp()
-        stderr = sys.stderr
-        sys.stderr = self.devnull
-        app.initialize(argv=[])
-        sys.stderr = stderr
-        load_jupyter_server_extension(app)
 
     def test_disable_extension(self):
         options = AppOptions(app_dir=self.tempdir())
@@ -547,13 +544,12 @@ class TestExtension(AppHandlerTest):
         assert disable_extension(self.pkg_names['extension'], app_options=options) is True
         assert enable_extension(self.pkg_names['extension'], app_options=options) is True
         info = get_app_info(app_options=options)
+        assert '@jupyterlab/notebook-extension' not in info['disabled']
         name = self.pkg_names['extension']
         assert name not in info['disabled']
         assert check_extension(name, app_options=options)
         assert disable_extension('@jupyterlab/notebook-extension', app_options=options) is True
-        assert name not in info['disabled']
         assert check_extension(name, app_options=options)
-        assert '@jupyterlab/notebook-extension' not in info['disabled']
         assert not check_extension('@jupyterlab/notebook-extension', app_options=options)
 
     @pytest.mark.slow
@@ -612,6 +608,22 @@ class TestExtension(AppHandlerTest):
 
         assert _test_overlap('*', '0.6') is None
         assert _test_overlap('<0.6', '0.1') is None
+
+        assert _test_overlap('^1 || ^2', '^1')
+        assert _test_overlap('^1 || ^2', '^2')
+        assert _test_overlap('^1', '^1 || ^2')
+        assert _test_overlap('^2', '^1 || ^2')
+        assert _test_overlap('^1 || ^2', '^2 || ^3')
+        assert not _test_overlap('^1 || ^2', '^3 || ^4')
+        assert not _test_overlap('^2', '^1 || ^3')
+
+    def test_compare_ranges(self):
+        assert _compare_ranges('^1 || ^2', '^1') == 0
+        assert _compare_ranges('^1 || ^2', '^2 || ^3') == 0
+        assert _compare_ranges('^1 || ^2', '^3 || ^4') == 1
+        assert _compare_ranges('^3 || ^4', '^1 || ^2') == -1
+        assert _compare_ranges('^2 || ^3', '^1 || ^4') is None
+
 
     def test_install_compatible(self):
         core_data = _get_default_core_data()
@@ -764,3 +776,12 @@ class TestExtension(AppHandlerTest):
         with p1, p2:
             assert update_extension(None, all_=True) is True
         assert sorted(updated) == [self.pkg_names['extension'], self.pkg_names['mimeextension']]
+
+
+def test_load_extension(serverapp, make_lab_app):
+    app = make_lab_app()
+    stderr = sys.stderr
+#    sys.stderr = self.devnull
+    app._link_jupyter_server_extension(serverapp)
+    app.initialize()
+    sys.stderr = stderr

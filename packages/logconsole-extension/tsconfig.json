@@ -28,10 +28,13 @@
       "path": "../rendermime"
     },
     {
-      "path": "../services"
+      "path": "../settingregistry"
     },
     {
       "path": "../statusbar"
+    },
+    {
+      "path": "../translation"
     },
     {
       "path": "../ui-components"

@@ -1,36 +1,31 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { ISettingRegistry } from '@jupyterlab/coreutils';
+import { toArray } from '@lumino/algorithm';
+import { Menu } from '@lumino/widgets';
 
 import {
   ILayoutRestorer,
   JupyterFrontEnd,
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
-
 import {
   ICommandPalette,
   IThemeManager,
   MainAreaWidget,
   WidgetTracker
 } from '@jupyterlab/apputils';
-
-import { TerminalSession } from '@jupyterlab/services';
-
 import { ILauncher } from '@jupyterlab/launcher';
-
 import { IFileMenu, IMainMenu } from '@jupyterlab/mainmenu';
-
-import { ITerminalTracker, ITerminal } from '@jupyterlab/terminal';
 import { IRunningSessionManagers, IRunningSessions } from '@jupyterlab/running';
+import { Terminal } from '@jupyterlab/services';
+import { ISettingRegistry } from '@jupyterlab/settingregistry';
+import { ITerminalTracker, ITerminal } from '@jupyterlab/terminal';
+import { ITranslator } from '@jupyterlab/translation';
+import { terminalIcon } from '@jupyterlab/ui-components';
 
 // Name-only import so as to not trigger inclusion in main bundle
 import * as WidgetModuleType from '@jupyterlab/terminal/lib/widget';
-
-import { Menu } from '@phosphor/widgets';
-
-import { toArray } from '@phosphor/algorithm';
 
 /**
  * The command IDs used by the terminal plugin.
@@ -50,23 +45,13 @@ namespace CommandIDs {
 }
 
 /**
- * The class name for the terminal icon in the default theme.
- */
-const TERMINAL_ICON_CLASS = 'jp-TerminalIcon';
-
-/**
- * The class name added to a running session item icon.
- */
-const ITEM_ICON_CLASS = 'jp-RunningSessions-itemIcon';
-
-/**
  * The default terminal extension.
  */
 const plugin: JupyterFrontEndPlugin<ITerminalTracker> = {
   activate,
   id: '@jupyterlab/terminal-extension:plugin',
   provides: ITerminalTracker,
-  requires: [ISettingRegistry],
+  requires: [ISettingRegistry, ITranslator],
   optional: [
     ICommandPalette,
     ILauncher,
@@ -89,6 +74,7 @@ export default plugin;
 function activate(
   app: JupyterFrontEnd,
   settingRegistry: ISettingRegistry,
+  translator: ITranslator,
   palette: ICommandPalette | null,
   launcher: ILauncher | null,
   restorer: ILayoutRestorer | null,
@@ -96,8 +82,9 @@ function activate(
   themeManager: IThemeManager | null,
   runningSessionManagers: IRunningSessionManagers | null
 ): ITerminalTracker {
+  const trans = translator.load('jupyterlab');
   const { serviceManager, commands } = app;
-  const category = 'Terminal';
+  const category = trans.__('Terminal');
   const namespace = 'terminal';
   const tracker = new WidgetTracker<MainAreaWidget<ITerminal.ITerminal>>({
     namespace
@@ -105,7 +92,7 @@ function activate(
 
   // Bail if there are no terminals available.
   if (!serviceManager.terminals.isAvailable()) {
-    console.log(
+    console.warn(
       'Disabling terminals plugin because they are not available on the server'
     );
     return tracker;
@@ -121,14 +108,14 @@ function activate(
   }
 
   // The cached terminal options from the setting editor.
-  let options: Partial<ITerminal.IOptions> = {};
+  const options: Partial<ITerminal.IOptions> = {};
 
   /**
    * Update the cached option values.
    */
   function updateOptions(settings: ISettingRegistry.ISettings): void {
     // Update the cached options by doing a shallow copy of key/values.
-    // This is needed because options is passed and used in addCommands and needs
+    // This is needed because options is passed and used in addcommand-palette and needs
     // to reflect the current cached values.
     Object.keys(settings.composite).forEach((key: keyof ITerminal.IOptions) => {
       (options as any)[key] = settings.composite[key];
@@ -171,7 +158,7 @@ function activate(
   // Subscribe to changes in theme. This is needed as the theme
   // is computed dynamically based on the string value and DOM
   // properties.
-  themeManager.themeChanged.connect((sender, args) => {
+  themeManager?.themeChanged.connect((sender, args) => {
     tracker.forEach(widget => {
       const terminal = widget.content;
       if (terminal.getOption('theme') === 'inherit') {
@@ -180,23 +167,31 @@ function activate(
     });
   });
 
-  addCommands(app, tracker, settingRegistry, options);
+  addCommands(app, tracker, settingRegistry, translator, options);
 
   if (mainMenu) {
     // Add "Terminal Theme" menu below "JupyterLab Themes" menu.
     const themeMenu = new Menu({ commands });
-    themeMenu.title.label = 'Terminal Theme';
+    themeMenu.title.label = trans.__('Terminal Theme');
     themeMenu.addItem({
       command: CommandIDs.setTheme,
-      args: { theme: 'inherit', isPalette: false }
+      args: {
+        theme: 'inherit',
+        displayName: trans.__('Inherit'),
+        isPalette: false
+      }
     });
     themeMenu.addItem({
       command: CommandIDs.setTheme,
-      args: { theme: 'light', isPalette: false }
+      args: {
+        theme: 'light',
+        displayName: trans.__('Light'),
+        isPalette: false
+      }
     });
     themeMenu.addItem({
       command: CommandIDs.setTheme,
-      args: { theme: 'dark', isPalette: false }
+      args: { theme: 'dark', displayName: trans.__('Dark'), isPalette: false }
     });
 
     // Add some commands to the "View" menu.
@@ -215,8 +210,7 @@ function activate(
     // Add terminal close-and-shutdown to the file menu.
     mainMenu.fileMenu.closeAndCleaners.add({
       tracker,
-      action: 'Shutdown',
-      name: 'Terminal',
+      closeAndCleanupLabel: (n: number) => trans.__('Shutdown Terminal'),
       closeAndCleanup: (current: MainAreaWidget<ITerminal.ITerminal>) => {
         // The widget is automatically disposed upon session shutdown.
         return current.content.session.shutdown();
@@ -237,17 +231,21 @@ function activate(
     palette.addItem({
       command: CommandIDs.setTheme,
       category,
-      args: { theme: 'inherit', isPalette: true }
+      args: {
+        theme: 'inherit',
+        displayName: trans.__('Inherit'),
+        isPalette: true
+      }
     });
     palette.addItem({
       command: CommandIDs.setTheme,
       category,
-      args: { theme: 'light', isPalette: true }
+      args: { theme: 'light', displayName: trans.__('Light'), isPalette: true }
     });
     palette.addItem({
       command: CommandIDs.setTheme,
       category,
-      args: { theme: 'dark', isPalette: true }
+      args: { theme: 'dark', displayName: trans.__('Dark'), isPalette: true }
     });
   }
 
@@ -255,14 +253,14 @@ function activate(
   if (launcher) {
     launcher.add({
       command: CommandIDs.createNew,
-      category: 'Other',
+      category: trans.__('Other'),
       rank: 0
     });
   }
 
   // Add a sessions manager if the running extension is available
   if (runningSessionManagers) {
-    addRunningSessionManager(runningSessionManagers, app);
+    addRunningSessionManager(runningSessionManagers, app, translator);
   }
 
   app.contextMenu.addItem({
@@ -279,12 +277,14 @@ function activate(
  */
 function addRunningSessionManager(
   managers: IRunningSessionManagers,
-  app: JupyterFrontEnd
+  app: JupyterFrontEnd,
+  translator: ITranslator
 ) {
-  let manager = app.serviceManager.terminals;
+  const trans = translator.load('jupyterlab');
+  const manager = app.serviceManager.terminals;
 
   managers.add({
-    name: 'Terminal',
+    name: trans.__('Terminals'),
     running: () =>
       toArray(manager.running()).map(model => new RunningTerminal(model)),
     shutdownAll: () => manager.shutdownAll(),
@@ -293,14 +293,14 @@ function addRunningSessionManager(
   });
 
   class RunningTerminal implements IRunningSessions.IRunningItem {
-    constructor(model: TerminalSession.IModel) {
+    constructor(model: Terminal.IModel) {
       this._model = model;
     }
     open() {
       void app.commands.execute('terminal:open', { name: this._model.name });
     }
-    iconClass() {
-      return `${ITEM_ICON_CLASS} ${TERMINAL_ICON_CLASS}`;
+    icon() {
+      return terminalIcon;
     }
     label() {
       return `terminals/${this._model.name}`;
@@ -309,7 +309,7 @@ function addRunningSessionManager(
       return manager.shutdown(this._model.name);
     }
 
-    private _model: TerminalSession.IModel;
+    private _model: Terminal.IModel;
   }
 }
 
@@ -320,15 +320,18 @@ export function addCommands(
   app: JupyterFrontEnd,
   tracker: WidgetTracker<MainAreaWidget<ITerminal.ITerminal>>,
   settingRegistry: ISettingRegistry,
+  translator: ITranslator,
   options: Partial<ITerminal.IOptions>
 ) {
+  const trans = translator.load('jupyterlab');
   const { commands, serviceManager } = app;
 
   // Add terminal commands.
   commands.addCommand(CommandIDs.createNew, {
-    label: args => (args['isPalette'] ? 'New Terminal' : 'Terminal'),
-    caption: 'Start a new terminal session',
-    iconClass: args => (args['isPalette'] ? '' : TERMINAL_ICON_CLASS),
+    label: args =>
+      args['isPalette'] ? trans.__('New Terminal') : trans.__('Terminal'),
+    caption: trans.__('Start a new terminal session'),
+    icon: args => (args['isPalette'] ? undefined : terminalIcon),
     execute: async args => {
       // wait for the widget to lazy load
       let Terminal: typeof WidgetModuleType.Terminal;
@@ -336,22 +339,21 @@ export function addCommands(
         Terminal = (await Private.ensureWidget()).Terminal;
       } catch (err) {
         Private.showErrorMessage(err);
+        return;
       }
 
       const name = args['name'] as string;
 
       const session = await (name
-        ? serviceManager.terminals
-            .connectTo(name)
-            .catch(() => serviceManager.terminals.startNew())
+        ? serviceManager.terminals.connectTo({ model: { name } })
         : serviceManager.terminals.startNew());
 
-      const term = new Terminal(session, options);
+      const term = new Terminal(session, options, translator);
 
-      term.title.icon = TERMINAL_ICON_CLASS;
+      term.title.icon = terminalIcon;
       term.title.label = '...';
 
-      let main = new MainAreaWidget({ content: term });
+      const main = new MainAreaWidget({ content: term });
       app.shell.add(main);
       void tracker.add(main);
       app.shell.activateById(main.id);
@@ -364,7 +366,7 @@ export function addCommands(
       const name = args['name'] as string;
       // Check for a running terminal with the given name.
       const widget = tracker.find(value => {
-        let content = value.content;
+        const content = value.content;
         return content.session.name === name || false;
       });
       if (widget) {
@@ -377,10 +379,10 @@ export function addCommands(
   });
 
   commands.addCommand(CommandIDs.refresh, {
-    label: 'Refresh Terminal',
-    caption: 'Refresh the current terminal session',
+    label: trans.__('Refresh Terminal'),
+    caption: trans.__('Refresh the current terminal session'),
     execute: async () => {
-      let current = tracker.currentWidget;
+      const current = tracker.currentWidget;
       if (!current) {
         return;
       }
@@ -398,10 +400,10 @@ export function addCommands(
   });
 
   commands.addCommand(CommandIDs.increaseFont, {
-    label: 'Increase Terminal Font Size',
+    label: trans.__('Increase Terminal Font Size'),
     execute: async () => {
-      let { fontSize } = options;
-      if (fontSize < 72) {
+      const { fontSize } = options;
+      if (fontSize && fontSize < 72) {
         try {
           await settingRegistry.set(plugin.id, 'fontSize', fontSize + 1);
         } catch (err) {
@@ -412,10 +414,10 @@ export function addCommands(
   });
 
   commands.addCommand(CommandIDs.decreaseFont, {
-    label: 'Decrease Terminal Font Size',
+    label: trans.__('Decrease Terminal Font Size'),
     execute: async () => {
-      let { fontSize } = options;
-      if (fontSize > 9) {
+      const { fontSize } = options;
+      if (fontSize && fontSize > 9) {
         try {
           await settingRegistry.set(plugin.id, 'fontSize', fontSize - 1);
         } catch (err) {
@@ -427,20 +429,23 @@ export function addCommands(
 
   commands.addCommand(CommandIDs.setTheme, {
     label: args => {
-      const theme = args['theme'] as string;
-      const displayName = theme[0].toUpperCase() + theme.substring(1);
+      const displayName = args['displayName'] as string;
       return args['isPalette']
-        ? `Use ${displayName} Terminal Theme`
+        ? trans.__('Use Terminal Theme: %1', displayName)
         : displayName;
     },
-    caption: 'Set the terminal theme',
-    isToggled: args => args['theme'] === ITerminal.defaultOptions.theme,
+    caption: trans.__('Set the terminal theme'),
+    isToggled: args => {
+      const { theme } = options;
+      return args['theme'] === theme;
+    },
     execute: async args => {
       const theme = args['theme'] as ITerminal.Theme;
       try {
         await settingRegistry.set(plugin.id, 'theme', theme);
         commands.notifyCommandChanged(CommandIDs.setTheme);
       } catch (err) {
+        console.log(err);
         Private.showErrorMessage(err);
       }
     }

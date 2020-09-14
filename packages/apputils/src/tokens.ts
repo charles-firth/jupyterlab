@@ -3,11 +3,27 @@
 
 import { IChangedArgs } from '@jupyterlab/coreutils';
 
-import { Token } from '@phosphor/coreutils';
+import { Token } from '@lumino/coreutils';
 
-import { IDisposable } from '@phosphor/disposable';
+import { IDisposable } from '@lumino/disposable';
 
-import { ISignal } from '@phosphor/signaling';
+import { ISignal } from '@lumino/signaling';
+
+import { ISessionContext } from './sessioncontext';
+
+/**
+ * An interface for the session context dialogs.
+ */
+export interface ISessionContextDialogs extends ISessionContext.IDialogs {}
+
+/* tslint:disable */
+/**
+ * The session context dialogs token.
+ */
+export const ISessionContextDialogs = new Token<ISessionContext.IDialogs>(
+  '@jupyterlab/apputils:ISessionContextDialogs'
+);
+/* tslint:enable */
 
 /* tslint:disable */
 /**
@@ -35,7 +51,7 @@ export interface IThemeManager {
   /**
    * A signal fired when the application theme changes.
    */
-  readonly themeChanged: ISignal<this, IChangedArgs<string>>;
+  readonly themeChanged: ISignal<this, IChangedArgs<string, string | null>>;
 
   /**
    * Load a theme CSS file by path.
@@ -68,6 +84,11 @@ export interface IThemeManager {
    * and if the user has scrollbar styling enabled.
    */
   themeScrollbars(name: string): boolean;
+
+  /**
+   * Get display name for theme.
+   */
+  getDisplayName(name: string): string;
 }
 
 /**
@@ -79,9 +100,14 @@ export namespace IThemeManager {
    */
   export interface ITheme {
     /**
-     * The display name of the theme.
+     * The unique identifier name of the theme.
      */
     name: string;
+
+    /**
+     * The display name of the theme.
+     */
+    displayName?: string;
 
     /**
      * Whether the theme is light or dark. Downstream authors

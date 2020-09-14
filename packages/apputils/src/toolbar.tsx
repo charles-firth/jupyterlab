@@ -1,26 +1,32 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { UseSignal, ReactWidget } from './vdom';
+import { Text } from '@jupyterlab/coreutils';
+import {
+  Button,
+  circleEmptyIcon,
+  circleIcon,
+  classes,
+  LabIcon,
+  refreshIcon,
+  stopIcon
+} from '@jupyterlab/ui-components';
 
-import { Kernel } from '@jupyterlab/services';
-
-import { Button, DefaultIconReact } from '@jupyterlab/ui-components';
-
-import { IIterator, find, map, some } from '@phosphor/algorithm';
-
-import { CommandRegistry } from '@phosphor/commands';
-
-import { Message, MessageLoop } from '@phosphor/messaging';
-
-import { AttachedProperty } from '@phosphor/properties';
-
-import { PanelLayout, Widget } from '@phosphor/widgets';
-
-import { IClientSession } from './clientsession';
-
+import { IIterator, find, map, some } from '@lumino/algorithm';
+import { CommandRegistry } from '@lumino/commands';
+import { ReadonlyJSONObject } from '@lumino/coreutils';
+import { Message, MessageLoop } from '@lumino/messaging';
+import { AttachedProperty } from '@lumino/properties';
+import { PanelLayout, Widget } from '@lumino/widgets';
 import * as React from 'react';
-import { ReadonlyJSONObject } from '@phosphor/coreutils';
+
+import { ISessionContext, sessionContextDialogs } from './sessioncontext';
+import { UseSignal, ReactWidget } from './vdom';
+import {
+  nullTranslator,
+  ITranslator,
+  TranslationBundle
+} from '@jupyterlab/translation';
 
 /**
  * The class name added to toolbars.
@@ -48,13 +54,6 @@ const TOOLBAR_SPACER_CLASS = 'jp-Toolbar-spacer';
 const TOOLBAR_KERNEL_STATUS_CLASS = 'jp-Toolbar-kernelStatus';
 
 /**
- * The class name added to a busy kernel indicator.
- */
-const TOOLBAR_BUSY_CLASS = 'jp-FilledCircleIcon';
-
-const TOOLBAR_IDLE_CLASS = 'jp-CircleIcon';
-
-/**
  * A layout for toolbars.
  *
  * #### Notes
@@ -76,8 +75,10 @@ class ToolbarLayout extends PanelLayout {
       // accommodate them.
       if (some(this.widgets, w => !w.isHidden)) {
         this.parent!.node.style.minHeight = 'var(--jp-private-toolbar-height)';
+        this.parent!.removeClass('jp-Toolbar-micro');
       } else {
         this.parent!.node.style.minHeight = '';
+        this.parent!.addClass('jp-Toolbar-micro');
       }
     }
 
@@ -184,6 +185,7 @@ export class Toolbar<T extends Widget = Widget> extends Widget {
   constructor() {
     super();
     this.addClass(TOOLBAR_CLASS);
+    this.addClass('jp-scrollbar-tiny');
     this.layout = new ToolbarLayout();
   }
 
@@ -193,7 +195,7 @@ export class Toolbar<T extends Widget = Widget> extends Widget {
    * @returns An iterator over the toolbar item names.
    */
   names(): IIterator<string> {
-    let layout = this.layout as ToolbarLayout;
+    const layout = this.layout as ToolbarLayout;
     return map(layout.widgets, widget => {
       return Private.nameProperty.get(widget);
     });
@@ -215,7 +217,7 @@ export class Toolbar<T extends Widget = Widget> extends Widget {
    * The item can be removed from the toolbar by setting its parent to `null`.
    */
   addItem(name: string, widget: T): boolean {
-    let layout = this.layout as ToolbarLayout;
+    const layout = this.layout as ToolbarLayout;
     return this.insertItem(layout.widgets.length, name, widget);
   }
 
@@ -236,12 +238,12 @@ export class Toolbar<T extends Widget = Widget> extends Widget {
    * The item can be removed from the toolbar by setting its parent to `null`.
    */
   insertItem(index: number, name: string, widget: T): boolean {
-    let existing = find(this.names(), value => value === name);
+    const existing = find(this.names(), value => value === name);
     if (existing) {
       return false;
     }
     widget.addClass(TOOLBAR_ITEM_CLASS);
-    let layout = this.layout as ToolbarLayout;
+    const layout = this.layout as ToolbarLayout;
     layout.insertWidget(index, widget);
     Private.nameProperty.set(widget, name);
     return true;
@@ -293,10 +295,10 @@ export class Toolbar<T extends Widget = Widget> extends Widget {
     name: string,
     widget: T
   ): boolean {
-    let nameWithIndex = map(this.names(), (name, i) => {
+    const nameWithIndex = map(this.names(), (name, i) => {
       return { name: name, index: i };
     });
-    let target = find(nameWithIndex, x => x.name === at);
+    const target = find(nameWithIndex, x => x.name === at);
     if (target) {
       return this.insertItem(target.index + offset, name, widget);
     }
@@ -327,9 +329,13 @@ export class Toolbar<T extends Widget = Widget> extends Widget {
    * Handle a DOM click event.
    */
   protected handleClick(event: Event) {
-    // Clicking a label focuses the corresponding control, so let it be.
+    // Clicking a label focuses the corresponding control
+    // that is linked with `for` attribute, so let it be.
     if (event.target instanceof HTMLLabelElement) {
-      return;
+      const forId = event.target.getAttribute('for');
+      if (forId && this.node.querySelector(`#${forId}`)) {
+        return;
+      }
     }
 
     // If this click already focused a control, let it be.
@@ -365,28 +371,40 @@ export namespace Toolbar {
   /**
    * Create an interrupt toolbar item.
    */
-  export function createInterruptButton(session: IClientSession): Widget {
+  export function createInterruptButton(
+    sessionContext: ISessionContext,
+    translator?: ITranslator
+  ): Widget {
+    translator = translator || nullTranslator;
+    const trans = translator.load('jupyterlab');
     return new ToolbarButton({
-      iconClassName: 'jp-StopIcon',
+      icon: stopIcon,
       onClick: () => {
-        if (session.kernel) {
-          void session.kernel.interrupt();
-        }
+        void sessionContext.session?.kernel?.interrupt();
       },
-      tooltip: 'Interrupt the kernel'
+      tooltip: trans.__('Interrupt the kernel')
     });
   }
 
   /**
    * Create a restart toolbar item.
    */
-  export function createRestartButton(session: IClientSession): Widget {
+  export function createRestartButton(
+    sessionContext: ISessionContext,
+    dialogs?: ISessionContext.IDialogs,
+    translator?: ITranslator
+  ): Widget {
+    translator = translator || nullTranslator;
+    const trans = translator.load('jupyterlab');
     return new ToolbarButton({
-      iconClassName: 'jp-RefreshIcon',
+      icon: refreshIcon,
       onClick: () => {
-        void session.restart();
+        void (dialogs ?? sessionContextDialogs).restart(
+          sessionContext,
+          translator
+        );
       },
-      tooltip: 'Restart the kernel'
+      tooltip: trans.__('Restart the kernel')
     });
   }
 
@@ -405,13 +423,20 @@ export namespace Toolbar {
    * Create a kernel name indicator item.
    *
    * #### Notes
-   * It will display the `'display_name`' of the current kernel,
-   * or `'No Kernel!'` if there is no kernel.
-   * It can handle a change in context or kernel.
+   * It will display the `'display_name`' of the session context. It can
+   * handle a change in context or kernel.
    */
-  export function createKernelNameItem(session: IClientSession): Widget {
+  export function createKernelNameItem(
+    sessionContext: ISessionContext,
+    dialogs?: ISessionContext.IDialogs,
+    translator?: ITranslator
+  ): Widget {
     const el = ReactWidget.create(
-      <Private.KernelNameComponent session={session} />
+      <Private.KernelNameComponent
+        sessionContext={sessionContext}
+        dialogs={dialogs ?? sessionContextDialogs}
+        translator={translator}
+      />
     );
     el.addClass('jp-KernelName');
     return el;
@@ -425,8 +450,11 @@ export namespace Toolbar {
    * It will show the current status in the node title.
    * It can handle a change to the context or the kernel.
    */
-  export function createKernelStatusItem(session: IClientSession): Widget {
-    return new Private.KernelStatus(session);
+  export function createKernelStatusItem(
+    sessionContext: ISessionContext,
+    translator?: ITranslator
+  ): Widget {
+    return new Private.KernelStatus(sessionContext, translator);
   }
 }
 
@@ -440,11 +468,25 @@ export namespace ToolbarButtonComponent {
   export interface IProps {
     className?: string;
     label?: string;
-    iconClassName?: string;
+    icon?: LabIcon.IMaybeResolvable;
+    iconClass?: string;
     iconLabel?: string;
     tooltip?: string;
     onClick?: () => void;
     enabled?: boolean;
+
+    /**
+     * Trigger the button on the actual onClick event rather than onMouseDown.
+     *
+     * See note in ToolbarButtonComponent below as to why the default is to
+     * trigger on onMouseDown.
+     */
+    actualOnClick?: boolean;
+
+    /**
+     * The application language translator.
+     */
+    translator?: ITranslator;
   }
 }
 
@@ -462,14 +504,20 @@ export function ToolbarButtonComponent(props: ToolbarButtonComponent.IProps) {
     // Fire action only when left button is pressed.
     if (event.button === 0) {
       event.preventDefault();
-      props.onClick();
+      props.onClick?.();
     }
   };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     const { key } = event;
     if (key === 'Enter' || key === ' ') {
-      props.onClick();
+      props.onClick?.();
+    }
+  };
+
+  const handleClick = (event: React.MouseEvent) => {
+    if (event.button === 0) {
+      props.onClick?.();
     }
   };
 
@@ -481,19 +529,24 @@ export function ToolbarButtonComponent(props: ToolbarButtonComponent.IProps) {
           : 'jp-ToolbarButtonComponent'
       }
       disabled={props.enabled === false}
-      onMouseDown={handleMouseDown}
+      onClick={props.actualOnClick ?? false ? handleClick : undefined}
+      onMouseDown={
+        !(props.actualOnClick ?? false) ? handleMouseDown : undefined
+      }
       onKeyDown={handleKeyDown}
       title={props.tooltip || props.iconLabel}
       minimal
     >
-      {props.iconClassName && (
-        <DefaultIconReact
-          name={`${props.iconClassName} jp-Icon jp-Icon-16`}
-          className={'jp-ToolbarButtonComponent-icon'}
-          fallback={true}
-          center={true}
-          kind={'toolbarButton'}
-          tag={'span'}
+      {(props.icon || props.iconClass) && (
+        <LabIcon.resolveReact
+          icon={props.icon}
+          iconClass={
+            // add some extra classes for proper support of icons-as-css-backgorund
+            classes(props.iconClass, 'jp-Icon')
+          }
+          className="jp-ToolbarButtonComponent-icon"
+          tag="span"
+          stylesheet="toolbarButton"
         />
       )}
       {props.label && (
@@ -598,24 +651,31 @@ namespace Private {
   export function propsFromCommand(
     options: CommandToolbarButtonComponent.IProps
   ): ToolbarButtonComponent.IProps {
-    let { commands, id, args } = options;
-    const iconClassName = commands.iconClass(id, args);
+    const { commands, id, args } = options;
+
+    const iconClass = commands.iconClass(id, args);
     const iconLabel = commands.iconLabel(id, args);
+    // DEPRECATED: remove _icon when lumino 2.0 is adopted
+    // if icon is aliasing iconClass, don't use it
+    const _icon = commands.icon(id, args);
+    const icon = _icon === iconClass ? undefined : _icon;
+
     const label = commands.label(id, args);
     let className = commands.className(id, args);
     // Add the boolean state classes.
     if (commands.isToggled(id, args)) {
-      className += ' p-mod-toggled';
+      className += ' lm-mod-toggled';
     }
     if (!commands.isVisible(id, args)) {
-      className += ' p-mod-hidden';
+      className += ' lm-mod-hidden';
     }
     const tooltip = commands.caption(id, args) || label || iconLabel;
     const onClick = () => {
       void commands.execute(id, args);
     };
     const enabled = commands.isEnabled(id, args);
-    return { className, iconClassName, tooltip, onClick, enabled, label };
+
+    return { className, icon, iconClass, tooltip, onClick, enabled, label };
   }
 
   /**
@@ -654,7 +714,9 @@ namespace Private {
      * Interface for KernelNameComponent props.
      */
     export interface IProps {
-      session: IClientSession;
+      sessionContext: ISessionContext;
+      dialogs: ISessionContext.IDialogs;
+      translator?: ITranslator;
     }
   }
 
@@ -666,17 +728,22 @@ namespace Private {
    */
 
   export function KernelNameComponent(props: KernelNameComponent.IProps) {
+    const translator = props.translator || nullTranslator;
+    const trans = translator.load('jupyterlab');
+    const callback = () => {
+      void props.dialogs.selectKernel(props.sessionContext, translator);
+    };
     return (
       <UseSignal
-        signal={props.session.kernelChanged}
-        initialSender={props.session}
+        signal={props.sessionContext.kernelChanged}
+        initialSender={props.sessionContext}
       >
-        {session => (
+        {sessionContext => (
           <ToolbarButtonComponent
             className={TOOLBAR_KERNEL_NAME_CLASS}
-            onClick={props.session.selectKernel.bind(props.session)}
-            tooltip={'Switch kernel'}
-            label={session.kernelDisplayName}
+            onClick={callback}
+            tooltip={trans.__('Switch kernel')}
+            label={sessionContext?.kernelDisplayName}
           />
         )}
       </UseSignal>
@@ -690,35 +757,61 @@ namespace Private {
     /**
      * Construct a new kernel status widget.
      */
-    constructor(session: IClientSession) {
+    constructor(sessionContext: ISessionContext, translator?: ITranslator) {
       super();
+      this.translator = translator || nullTranslator;
+      this._trans = this.translator.load('jupyterlab');
       this.addClass(TOOLBAR_KERNEL_STATUS_CLASS);
-      this._onStatusChanged(session);
-      session.statusChanged.connect(this._onStatusChanged, this);
+      this._onStatusChanged(sessionContext);
+      sessionContext.statusChanged.connect(this._onStatusChanged, this);
     }
 
     /**
      * Handle a status on a kernel.
      */
-    private _onStatusChanged(session: IClientSession) {
+    private _onStatusChanged(sessionContext: ISessionContext) {
       if (this.isDisposed) {
         return;
       }
-      let status = session.status;
-      const busy = this._isBusy(status);
-      this.toggleClass(TOOLBAR_BUSY_CLASS, busy);
-      this.toggleClass(TOOLBAR_IDLE_CLASS, !busy);
-      let title = 'Kernel ' + status[0].toUpperCase() + status.slice(1);
-      this.node.title = title;
+
+      const status = sessionContext.kernelDisplayStatus;
+
+      // set the icon
+      if (this._isBusy(status)) {
+        circleIcon.element({
+          container: this.node,
+          title: this._trans.__('Kernel %1', Text.titleCase(status)),
+
+          stylesheet: 'toolbarButton',
+          alignSelf: 'normal',
+          height: '24px'
+        });
+      } else {
+        circleEmptyIcon.element({
+          container: this.node,
+          title: this._trans.__('Kernel %1', Text.titleCase(status)),
+
+          stylesheet: 'toolbarButton',
+          alignSelf: 'normal',
+          height: '24px'
+        });
+      }
     }
 
     /**
      * Check if status should be shown as busy.
      */
-    private _isBusy(status: Kernel.Status): boolean {
+    private _isBusy(status: ISessionContext.KernelDisplayStatus): boolean {
       return (
-        status === 'busy' || status === 'starting' || status === 'restarting'
+        status === 'busy' ||
+        status === 'starting' ||
+        status === 'terminating' ||
+        status === 'restarting' ||
+        status === 'initializing'
       );
     }
+
+    protected translator: ITranslator;
+    private _trans: TranslationBundle;
   }
 }

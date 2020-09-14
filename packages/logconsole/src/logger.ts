@@ -1,7 +1,7 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { nbformat } from '@jupyterlab/coreutils';
+import * as nbformat from '@jupyterlab/nbformat';
 
 import { IOutputAreaModel, OutputAreaModel } from '@jupyterlab/outputarea';
 
@@ -11,7 +11,7 @@ import {
   OutputModel
 } from '@jupyterlab/rendermime';
 
-import { ISignal, Signal } from '@phosphor/signaling';
+import { ISignal, Signal } from '@lumino/signaling';
 
 import {
   ILogger,
@@ -74,7 +74,7 @@ export class LogOutputModel extends OutputModel implements ILogOutputModel {
   /**
    * Date & time when output is logged.
    */
-  readonly timestamp: Date = null;
+  readonly timestamp: Date;
 
   /**
    * Log level
@@ -108,7 +108,8 @@ class LogConsoleModelContentFactory extends OutputAreaModel.ContentFactory {
  * Output Area Model implementation which is able to
  * limit number of outputs stored.
  */
-export class LoggerOutputAreaModel extends OutputAreaModel
+export class LoggerOutputAreaModel
+  extends OutputAreaModel
   implements ILoggerOutputAreaModel {
   constructor({ maxLength, ...options }: LoggerOutputAreaModel.IOptions) {
     super(options);
@@ -143,8 +144,8 @@ export class LoggerOutputAreaModel extends OutputAreaModel
   }): boolean {
     const { value, lastModel } = options;
 
-    let oldSeconds = Math.trunc(lastModel.timestamp.getTime() / 1000);
-    let newSeconds = Math.trunc(value.timestamp / 1000);
+    const oldSeconds = Math.trunc(lastModel.timestamp.getTime() / 1000);
+    const newSeconds = Math.trunc(value.timestamp / 1000);
 
     return oldSeconds === newSeconds;
   }
@@ -226,7 +227,7 @@ export class Logger implements ILogger {
     return this._level;
   }
   set level(newValue: LogLevel) {
-    let oldValue = this._level;
+    const oldValue = this._level;
     if (oldValue === newValue) {
       return;
     }
@@ -272,8 +273,8 @@ export class Logger implements ILogger {
   }
   set rendermime(value: IRenderMimeRegistry | null) {
     if (value !== this._rendermime) {
-      let oldValue = this._rendermime;
-      let newValue = (this._rendermime = value);
+      const oldValue = this._rendermime;
+      const newValue = (this._rendermime = value);
       this._stateChanged.emit({ name: 'rendermime', oldValue, newValue });
     }
   }
@@ -312,7 +313,7 @@ export class Logger implements ILogger {
     ) {
       return;
     }
-    let output: nbformat.IOutput = null;
+    let output: nbformat.IOutput | null = null;
     switch (log.type) {
       case 'text':
         output = {
@@ -384,7 +385,7 @@ export class Logger implements ILogger {
     }
     this._isDisposed = true;
     this.clear();
-    this._rendermime = null;
+    this._rendermime = null!;
     Signal.clearData(this);
   }
 

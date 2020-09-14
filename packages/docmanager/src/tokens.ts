@@ -1,13 +1,13 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { Token } from '@phosphor/coreutils';
+import { Token } from '@lumino/coreutils';
 
-import { IDisposable } from '@phosphor/disposable';
+import { IDisposable } from '@lumino/disposable';
 
-import { ISignal } from '@phosphor/signaling';
+import { ISignal } from '@lumino/signaling';
 
-import { Widget } from '@phosphor/widgets';
+import { Widget } from '@lumino/widgets';
 
 import { DocumentRegistry, IDocumentWidget } from '@jupyterlab/docregistry';
 
@@ -40,6 +40,14 @@ export interface IDocumentManager extends IDisposable {
    * A signal emitted when one of the documents is activated.
    */
   readonly activateRequested: ISignal<this, string>;
+
+  /**
+   * The mode of the document manager, either 'single-document' or
+   * 'multiple-document' and usually matches that of the shell. When this
+   * is 'single-document' the document manager will open documents in a
+   * separate browser tab.
+   */
+  mode: string;
 
   /**
    * Whether to autosave documents.
@@ -120,7 +128,7 @@ export interface IDocumentManager extends IDisposable {
     path: string,
     widgetName?: string,
     kernel?: Partial<Kernel.IModel>
-  ): Widget;
+  ): Widget | undefined;
 
   /**
    * Delete a file.

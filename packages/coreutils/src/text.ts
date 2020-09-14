@@ -29,10 +29,10 @@ export namespace Text {
     }
     let charIdx = jsIdx;
     for (let i = 0; i + 1 < text.length && i < jsIdx; i++) {
-      let charCode = text.charCodeAt(i);
+      const charCode = text.charCodeAt(i);
       // check for surrogate pair
       if (charCode >= 0xd800 && charCode <= 0xdbff) {
-        let nextCharCode = text.charCodeAt(i + 1);
+        const nextCharCode = text.charCodeAt(i + 1);
         if (nextCharCode >= 0xdc00 && nextCharCode <= 0xdfff) {
           charIdx--;
           i++;
@@ -58,10 +58,10 @@ export namespace Text {
     }
     let jsIdx = charIdx;
     for (let i = 0; i + 1 < text.length && i < jsIdx; i++) {
-      let charCode = text.charCodeAt(i);
+      const charCode = text.charCodeAt(i);
       // check for surrogate pair
       if (charCode >= 0xd800 && charCode <= 0xdbff) {
-        let nextCharCode = text.charCodeAt(i + 1);
+        const nextCharCode = text.charCodeAt(i + 1);
         if (nextCharCode >= 0xdc00 && nextCharCode <= 0xdfff) {
           jsIdx++;
           i++;
@@ -72,8 +72,8 @@ export namespace Text {
   }
 
   /**
-   * Given a 'snake-case', 'snake_case', or 'snake case' string,
-   * will return the camel case version: 'snakeCase'.
+   * Given a 'snake-case', 'snake_case', 'snake:case', or
+   * 'snake case' string, will return the camel case version: 'snakeCase'.
    *
    * @param str: the snake-case input string.
    *
@@ -83,13 +83,11 @@ export namespace Text {
    * @returns the camel case version of the input string.
    */
   export function camelCase(str: string, upper: boolean = false): string {
-    return str.replace(/(?:^\w|[A-Z]|\b\w|\s+|-+|_+)/g, function(match, index) {
-      if (+match === 0 || match[0] === '-') {
-        return '';
-      } else if (index === 0 && !upper) {
-        return match.toLowerCase();
+    return str.replace(/^(\w)|[\s-_:]+(\w)/g, function (match, p1, p2) {
+      if (p2) {
+        return p2.toUpperCase();
       } else {
-        return match.toUpperCase();
+        return upper ? p1.toUpperCase() : p1.toLowerCase();
       }
     });
   }
@@ -102,7 +100,7 @@ export namespace Text {
    * @returns the same string, but with each word capitalized.
    */
   export function titleCase(str: string) {
-    return str
+    return (str || '')
       .toLowerCase()
       .split(' ')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))

@@ -1,53 +1,42 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { KernelMessage } from '@jupyterlab/services';
-
 import {
-  IClientSession,
+  ISessionContext,
   Clipboard,
   Dialog,
   showDialog
 } from '@jupyterlab/apputils';
-
-import { nbformat } from '@jupyterlab/coreutils';
 
 import {
   ICellModel,
   ICodeCellModel,
   CodeCell,
   Cell,
-  MarkdownCell
+  MarkdownCell,
+  isMarkdownCellModel,
+  isRawCellModel,
+  isCodeCellModel
 } from '@jupyterlab/cells';
 
-import { ArrayExt, each, toArray } from '@phosphor/algorithm';
+import * as nbformat from '@jupyterlab/nbformat';
 
-import { JSONObject } from '@phosphor/coreutils';
+import { KernelMessage } from '@jupyterlab/services';
 
-import { ElementExt } from '@phosphor/domutils';
+import { ArrayExt, each, toArray } from '@lumino/algorithm';
 
-import { ISignal, Signal } from '@phosphor/signaling';
+import { JSONObject, JSONExt } from '@lumino/coreutils';
+
+import { ElementExt } from '@lumino/domutils';
+
+import { ISignal, Signal } from '@lumino/signaling';
 
 import * as React from 'react';
 
 import { INotebookModel } from './model';
 
 import { Notebook } from './widget';
-
-// The message to display to the user when prompting to trust the notebook.
-const TRUST_MESSAGE = (
-  <p>
-    A trusted Jupyter notebook may execute hidden malicious code when you open
-    it.
-    <br />
-    Selecting trust will re-render this notebook in a trusted state.
-    <br />
-    For more information, see the
-    <a href="https://jupyter-notebook.readthedocs.io/en/stable/security.html">
-      Jupyter security documentation
-    </a>
-  </p>
-);
+import { nullTranslator, ITranslator } from '@jupyterlab/translation';
 
 /**
  * The mimetype used for Jupyter cell data.
@@ -80,7 +69,9 @@ export class NotebookActions {
    * standalone class is because at run time, the `Private.executed` variable
    * does not yet exist, so it needs to be referenced via a getter.
    */
-  private constructor() {}
+  private constructor() {
+    // Intentionally empty.
+  }
 }
 
 /**
@@ -117,13 +108,13 @@ export namespace NotebookActions {
     const selections = editor.getSelections();
     const orig = child.model.value.text;
 
-    let offsets = [0];
+    const offsets = [0];
 
     for (let i = 0; i < selections.length; i++) {
       // append start and end to handle selections
       // cursors will have same start and end
-      let start = editor.getOffsetAt(selections[i].start);
-      let end = editor.getOffsetAt(selections[i].end);
+      const start = editor.getOffsetAt(selections[i].start);
+      const end = editor.getOffsetAt(selections[i].end);
       if (start < end) {
         offsets.push(start);
         offsets.push(end);
@@ -137,9 +128,9 @@ export namespace NotebookActions {
 
     offsets.push(orig.length);
 
-    let clones: ICellModel[] = [];
+    const clones: ICellModel[] = [];
     for (let i = 0; i + 1 < offsets.length; i++) {
-      let clone = Private.cloneCell(nbModel, child.model);
+      const clone = Private.cloneCell(nbModel, child.model);
       clones.push(clone);
     }
 
@@ -194,6 +185,7 @@ export namespace NotebookActions {
     const cells = model.cells;
     const primary = notebook.activeCell;
     const active = notebook.activeCellIndex;
+    const attachments: nbformat.IAttachments = {};
 
     // Get the cells to merge.
     notebook.widgets.forEach((child, index) => {
@@ -201,6 +193,13 @@ export namespace NotebookActions {
         toMerge.push(child.model.value.text);
         if (index !== active) {
           toDelete.push(child.model);
+        }
+        // Collect attachments if the cell is a markdown cell or a raw cell
+        const model = child.model;
+        if (isRawCellModel(model) || isMarkdownCellModel(model)) {
+          for (const key of model.attachments.keys) {
+            attachments[key] = model.attachments.get(key)!.toJSON();
+          }
         }
       }
     });
@@ -225,8 +224,10 @@ export namespace NotebookActions {
     const newModel = Private.cloneCell(model, primary.model);
 
     newModel.value.text = toMerge.join('\n\n');
-    if (newModel.type === 'code') {
-      (newModel as ICodeCellModel).outputs.clear();
+    if (isCodeCellModel(newModel)) {
+      newModel.outputs.clear();
+    } else if (isMarkdownCellModel(newModel) || isRawCellModel(newModel)) {
+      newModel.attachments.fromJSON(attachments);
     }
 
     // Make the changes while preserving history.
@@ -264,7 +265,7 @@ export namespace NotebookActions {
     const state = Private.getState(notebook);
 
     Private.deleteCells(notebook);
-    Private.handleState(notebook, state);
+    Private.handleState(notebook, state, true);
   }
 
   /**
@@ -424,7 +425,7 @@ export namespace NotebookActions {
    *
    * @param notebook - The target notebook widget.
    *
-   * @param session - The optional client session object.
+   * @param sessionContext - The optional client session object.
    *
    * #### Notes
    * The last selected cell will be activated, but not scrolled into view.
@@ -434,14 +435,14 @@ export namespace NotebookActions {
    */
   export function run(
     notebook: Notebook,
-    session?: IClientSession
+    sessionContext?: ISessionContext
   ): Promise<boolean> {
     if (!notebook.model || !notebook.activeCell) {
       return Promise.resolve(false);
     }
 
     const state = Private.getState(notebook);
-    const promise = Private.runSelected(notebook, session);
+    const promise = Private.runSelected(notebook, sessionContext);
 
     Private.handleRunState(notebook, state, false);
     return promise;
@@ -452,7 +453,7 @@ export namespace NotebookActions {
    *
    * @param notebook - The target notebook widget.
    *
-   * @param session - The optional client session object.
+   * @param sessionContext - The optional client session object.
    *
    * #### Notes
    * The existing selection will be cleared.
@@ -464,14 +465,14 @@ export namespace NotebookActions {
    */
   export function runAndAdvance(
     notebook: Notebook,
-    session?: IClientSession
+    sessionContext?: ISessionContext
   ): Promise<boolean> {
     if (!notebook.model || !notebook.activeCell) {
       return Promise.resolve(false);
     }
 
     const state = Private.getState(notebook);
-    const promise = Private.runSelected(notebook, session);
+    const promise = Private.runSelected(notebook, sessionContext);
     const model = notebook.model;
 
     if (notebook.activeCellIndex === notebook.widgets.length - 1) {
@@ -495,7 +496,7 @@ export namespace NotebookActions {
    *
    * @param notebook - The target notebook widget.
    *
-   * @param session - The optional client session object.
+   * @param sessionContext - The optional client session object.
    *
    * #### Notes
    * An execution error will prevent the remaining code cells from executing.
@@ -507,14 +508,14 @@ export namespace NotebookActions {
    */
   export function runAndInsert(
     notebook: Notebook,
-    session?: IClientSession
+    sessionContext?: ISessionContext
   ): Promise<boolean> {
     if (!notebook.model || !notebook.activeCell) {
       return Promise.resolve(false);
     }
 
     const state = Private.getState(notebook);
-    const promise = Private.runSelected(notebook, session);
+    const promise = Private.runSelected(notebook, sessionContext);
     const model = notebook.model;
     const cell = model.contentFactory.createCell(
       notebook.notebookConfig.defaultCell,
@@ -533,7 +534,7 @@ export namespace NotebookActions {
    *
    * @param notebook - The target notebook widget.
    *
-   * @param session - The optional client session object.
+   * @param sessionContext - The optional client session object.
    *
    * #### Notes
    * The existing selection will be cleared.
@@ -543,7 +544,7 @@ export namespace NotebookActions {
    */
   export function runAll(
     notebook: Notebook,
-    session?: IClientSession
+    sessionContext?: ISessionContext
   ): Promise<boolean> {
     if (!notebook.model || !notebook.activeCell) {
       return Promise.resolve(false);
@@ -555,7 +556,7 @@ export namespace NotebookActions {
       notebook.select(child);
     });
 
-    const promise = Private.runSelected(notebook, session);
+    const promise = Private.runSelected(notebook, sessionContext);
 
     Private.handleRunState(notebook, state, true);
     return promise;
@@ -563,7 +564,7 @@ export namespace NotebookActions {
 
   export function renderAllMarkdown(
     notebook: Notebook,
-    session?: IClientSession
+    sessionContext?: ISessionContext
   ): Promise<boolean> {
     if (!notebook.model || !notebook.activeCell) {
       return Promise.resolve(false);
@@ -581,7 +582,7 @@ export namespace NotebookActions {
     if (notebook.activeCell.model.type !== 'markdown') {
       return Promise.resolve(true);
     }
-    const promise = Private.runSelected(notebook, session);
+    const promise = Private.runSelected(notebook, sessionContext);
     notebook.activeCellIndex = previousIndex;
     Private.handleRunState(notebook, state, true);
     return promise;
@@ -592,7 +593,7 @@ export namespace NotebookActions {
    *
    * @param notebook - The target notebook widget.
    *
-   * @param session - The optional client session object.
+   * @param sessionContext - The optional client session object.
    *
    * #### Notes
    * The existing selection will be cleared.
@@ -602,7 +603,7 @@ export namespace NotebookActions {
    */
   export function runAllAbove(
     notebook: Notebook,
-    session?: IClientSession
+    sessionContext?: ISessionContext
   ): Promise<boolean> {
     const { activeCell, activeCellIndex, model } = notebook;
 
@@ -618,7 +619,7 @@ export namespace NotebookActions {
       notebook.select(notebook.widgets[i]);
     }
 
-    const promise = Private.runSelected(notebook, session);
+    const promise = Private.runSelected(notebook, sessionContext);
 
     notebook.activeCellIndex++;
     Private.handleRunState(notebook, state, true);
@@ -630,7 +631,7 @@ export namespace NotebookActions {
    *
    * @param notebook - The target notebook widget.
    *
-   * @param session - The optional client session object.
+   * @param sessionContext - The optional client session object.
    *
    * #### Notes
    * The existing selection will be cleared.
@@ -640,7 +641,7 @@ export namespace NotebookActions {
    */
   export function runAllBelow(
     notebook: Notebook,
-    session?: IClientSession
+    sessionContext?: ISessionContext
   ): Promise<boolean> {
     if (!notebook.model || !notebook.activeCell) {
       return Promise.resolve(false);
@@ -653,10 +654,23 @@ export namespace NotebookActions {
       notebook.select(notebook.widgets[i]);
     }
 
-    const promise = Private.runSelected(notebook, session);
+    const promise = Private.runSelected(notebook, sessionContext);
 
     Private.handleRunState(notebook, state, true);
     return promise;
+  }
+
+  /**
+   * Replaces the selection in the active cell of the notebook.
+   *
+   * @param notebook - The target notebook widget.
+   * @param text - The text to replace the selection.
+   */
+  export function replaceSelection(notebook: Notebook, text: string): void {
+    if (!notebook.model || !notebook.activeCell) {
+      return;
+    }
+    notebook.activeCell.editor.replaceSelection?.(text);
   }
 
   /**
@@ -913,7 +927,7 @@ export namespace NotebookActions {
       case 'above':
         index = notebook.activeCellIndex - 1;
         break;
-      case 'replace':
+      case 'replace': {
         // Find the cells to delete.
         const toDelete: number[] = [];
 
@@ -934,6 +948,7 @@ export namespace NotebookActions {
         }
         index = toDelete[0];
         break;
+      }
       default:
         break;
     }
@@ -1022,19 +1037,6 @@ export namespace NotebookActions {
   }
 
   /**
-   * Toggle whether to record cell timing execution.
-   *
-   * @param notebook - The target notebook widget.
-   */
-  export function toggleRecordTiming(notebook: Notebook): void {
-    if (!notebook.model) {
-      return;
-    }
-    const currentValue = notebook.model.metadata.get('record_timing') || false;
-    notebook.model.metadata.set('record_timing', !currentValue);
-  }
-
-  /**
    * Clear the code outputs of the selected cells.
    *
    * @param notebook - The target notebook widget.
@@ -1053,9 +1055,8 @@ export namespace NotebookActions {
       const child = notebook.widgets[index];
 
       if (notebook.isSelectedOrActive(child) && cell.type === 'code') {
-        cell.outputs.clear();
+        cell.clearExecution();
         (child as CodeCell).outputHidden = false;
-        cell.executionCount = null;
       }
     });
     Private.handleState(notebook, state);
@@ -1080,8 +1081,7 @@ export namespace NotebookActions {
       const child = notebook.widgets[index];
 
       if (cell.type === 'code') {
-        cell.outputs.clear();
-        cell.executionCount = null;
+        cell.clearExecution();
         (child as CodeCell).outputHidden = false;
       }
     });
@@ -1289,6 +1289,43 @@ export namespace NotebookActions {
   }
 
   /**
+   * Go to the last cell that is run or current if it is running.
+   *
+   * Note: This requires execution timing to be toggled on or this will have
+   * no effect.
+   *
+   * @param notebook - The target notebook widget.
+   */
+  export function selectLastRunCell(notebook: Notebook): void {
+    let latestTime: Date | null = null;
+    let latestCellIdx: number | null = null;
+    notebook.widgets.forEach((cell, cellIndx) => {
+      if (cell.model.type === 'code') {
+        const execution = (cell as CodeCell).model.metadata.get('execution');
+        if (
+          execution &&
+          JSONExt.isObject(execution) &&
+          execution['iopub.status.busy'] !== undefined
+        ) {
+          // The busy status is used as soon as a request is received:
+          // https://jupyter-client.readthedocs.io/en/stable/messaging.html
+          const timestamp = execution['iopub.status.busy']!.toString();
+          if (timestamp) {
+            const startTime = new Date(timestamp);
+            if (!latestTime || startTime >= latestTime) {
+              latestTime = startTime;
+              latestCellIdx = cellIndx;
+            }
+          }
+        }
+      }
+    });
+    if (latestCellIdx !== null) {
+      notebook.activeCellIndex = latestCellIdx;
+    }
+  }
+
+  /**
    * Set the markdown header level.
    *
    * @param notebook - The target notebook widget.
@@ -1330,7 +1367,13 @@ export namespace NotebookActions {
    * #### Notes
    * No dialog will be presented if the notebook is already trusted.
    */
-  export function trust(notebook: Notebook): Promise<void> {
+  export function trust(
+    notebook: Notebook,
+    translator?: ITranslator
+  ): Promise<void> {
+    translator = translator || nullTranslator;
+    const trans = translator.load('jupyterlab');
+
     if (!notebook.model) {
       return Promise.resolve();
     }
@@ -1338,18 +1381,38 @@ export namespace NotebookActions {
 
     const cells = toArray(notebook.model.cells);
     const trusted = cells.every(cell => cell.trusted);
+    // FIXME
+    const trustMessage = (
+      <p>
+        {trans.__(
+          'A trusted Jupyter notebook may execute hidden malicious code when you openit.'
+        )}
+        <br />
+        {trans.__(
+          'Selecting trust will re-render this notebook in a trusted state.'
+        )}
+        <br />
+        {trans.__(
+          'For more information, see the <a href="https://jupyter-server.readthedocs.io/en/stable/operators/security.html">%1</a>',
+          trans.__('Jupyter security documentation')
+        )}
+      </p>
+    );
 
     if (trusted) {
       return showDialog({
-        body: 'Notebook is already trusted',
-        buttons: [Dialog.okButton()]
+        body: trans.__('Notebook is already trusted'),
+        buttons: [Dialog.okButton({ label: trans.__('Ok') })]
       }).then(() => undefined);
     }
 
     return showDialog({
-      body: TRUST_MESSAGE,
-      title: 'Trust this notebook?',
-      buttons: [Dialog.cancelButton(), Dialog.warnButton()]
+      body: trustMessage,
+      title: trans.__('Trust this notebook?'),
+      buttons: [
+        Dialog.cancelButton({ label: trans.__('Cancel') }),
+        Dialog.warnButton({ label: trans.__('Ok') })
+      ] // FIXME?
     }).then(result => {
       if (result.button.accept) {
         cells.forEach(cell => {
@@ -1383,7 +1446,7 @@ namespace Private {
     /**
      * The active cell before the action.
      */
-    activeCell: Cell;
+    activeCell: Cell | null;
   }
 
   /**
@@ -1410,7 +1473,7 @@ namespace Private {
       notebook.activate();
     }
 
-    if (scrollIfNeeded) {
+    if (scrollIfNeeded && activeCell) {
       ElementExt.scrollIntoViewIfNeeded(node, activeCell.node);
     }
   }
@@ -1426,7 +1489,7 @@ namespace Private {
     if (state.wasFocused || notebook.mode === 'edit') {
       notebook.activate();
     }
-    if (scroll) {
+    if (scroll && state.activeCell) {
       // Scroll to the top of the previous active cell output.
       const rect = state.activeCell.inputArea.node.getBoundingClientRect();
 
@@ -1459,7 +1522,7 @@ namespace Private {
    */
   export function runSelected(
     notebook: Notebook,
-    session?: IClientSession
+    sessionContext?: ISessionContext
   ): Promise<boolean> {
     notebook.mode = 'command';
 
@@ -1477,7 +1540,9 @@ namespace Private {
     notebook.activeCellIndex = lastIndex;
     notebook.deselectAll();
 
-    return Promise.all(selected.map(child => runCell(notebook, child, session)))
+    return Promise.all(
+      selected.map(child => runCell(notebook, child, sessionContext))
+    )
       .then(results => {
         if (notebook.isDisposed) {
           return false;
@@ -1515,8 +1580,12 @@ namespace Private {
   function runCell(
     notebook: Notebook,
     cell: Cell,
-    session?: IClientSession
+    sessionContext?: ISessionContext,
+    translator?: ITranslator
   ): Promise<boolean> {
+    translator = translator || nullTranslator;
+    const trans = translator.load('jupyterlab');
+
     switch (cell.model.type) {
       case 'markdown':
         (cell as MarkdownCell).rendered = true;
@@ -1524,16 +1593,25 @@ namespace Private {
         executed.emit({ notebook, cell });
         break;
       case 'code':
-        if (session) {
-          return CodeCell.execute(cell as CodeCell, session, {
-            deletedCells: notebook.model.deletedCells,
-            recordTiming: notebook.model.metadata.get('record_timing') || false
+        if (sessionContext) {
+          if (sessionContext.isTerminating) {
+            void showDialog({
+              title: trans.__('Kernel Terminating'),
+              body: trans.__(
+                'The kernel for %1 appears to be terminating. You can not run any cell for now.',
+                sessionContext.session?.path
+              ),
+              buttons: [Dialog.okButton({ label: trans.__('Ok') })]
+            });
+            break;
+          }
+          const deletedCells = notebook.model?.deletedCells ?? [];
+          return CodeCell.execute(cell as CodeCell, sessionContext, {
+            deletedCells,
+            recordTiming: notebook.notebookConfig.recordTiming
           })
             .then(reply => {
-              notebook.model.deletedCells.splice(
-                0,
-                notebook.model.deletedCells.length
-              );
+              deletedCells.splice(0, deletedCells.length);
               if (cell.isDisposed) {
                 return false;
               }
@@ -1555,11 +1633,10 @@ namespace Private {
               }
             })
             .catch(reason => {
-              if (reason.message !== 'Canceled') {
-                throw reason;
+              if (cell.isDisposed || reason.message.startsWith('Canceled')) {
+                return false;
               }
-
-              return false;
+              throw reason;
             })
             .then(ran => {
               if (ran) {
@@ -1569,7 +1646,7 @@ namespace Private {
               return ran;
             });
         }
-        (cell.model as ICodeCellModel).executionCount = null;
+        (cell.model as ICodeCellModel).clearExecution();
         break;
       default:
         break;
@@ -1591,7 +1668,7 @@ namespace Private {
     notebook: Notebook,
     cell: Cell
   ) {
-    const setNextInput = content.payload.filter(i => {
+    const setNextInput = content.payload?.filter(i => {
       return (i as any).source === 'set_next_input';
     })[0];
 
@@ -1599,8 +1676,8 @@ namespace Private {
       return;
     }
 
-    const text = (setNextInput as any).text;
-    const replace = (setNextInput as any).replace;
+    const text = setNextInput.text as string;
+    const replace = setNextInput.replace;
 
     if (replace) {
       cell.model.value.text = text;
@@ -1608,8 +1685,8 @@ namespace Private {
     }
 
     // Create a new code cell and add as the next cell.
-    const newCell = notebook.model.contentFactory.createCodeCell({});
-    const cells = notebook.model.cells;
+    const newCell = notebook.model!.contentFactory.createCodeCell({});
+    const cells = notebook.model!.cells;
     const index = ArrayExt.firstIndexOf(toArray(cells), cell.model);
 
     newCell.value.text = text;
@@ -1638,7 +1715,7 @@ namespace Private {
     notebook.mode = 'command';
     clipboard.clear();
 
-    let data = notebook.widgets
+    const data = notebook.widgets
       .filter(cell => notebook.isSelectedOrActive(cell))
       .map(cell => cell.model.toJSON())
       .map(cellJSON => {
@@ -1674,7 +1751,7 @@ namespace Private {
     notebook: Notebook,
     value: nbformat.CellType
   ): void {
-    const model = notebook.model;
+    const model = notebook.model!;
     const cells = model.cells;
 
     cells.beginCompoundOperation();
@@ -1726,7 +1803,7 @@ namespace Private {
    * This action can be undone.
    */
   export function deleteCells(notebook: Notebook): void {
-    const model = notebook.model;
+    const model = notebook.model!;
     const cells = model.cells;
     const toDelete: number[] = [];
 
@@ -1738,7 +1815,7 @@ namespace Private {
 
       if (notebook.isSelectedOrActive(child) && deletable) {
         toDelete.push(index);
-        notebook.model.deletedCells.push(child.model.id);
+        model.deletedCells.push(child.model.id);
       }
     });
 

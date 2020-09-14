@@ -6,7 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 from threading import Event
 
-from notebook.base.handlers import APIHandler
+from jupyter_server.base.handlers import APIHandler
+from jupyter_server.extension.handler import ExtensionHandlerMixin
 from tornado import gen, web
 from tornado.concurrent import run_on_executor
 
@@ -22,10 +23,8 @@ class Builder(object):
     _kill_event = None
     _future = None
 
-    # TODO 2.0: Clean up signature to (self, core_mode, app_options=None)
-    def __init__(self, log, core_mode, app_dir, core_config=None, app_options=None):
-        app_options = _ensure_options(
-            app_options, logger=log, app_dir=app_dir, core_config=core_config)
+    def __init__(self, core_mode, app_options=None):
+        app_options = _ensure_options(app_options)
         self.log = app_options.logger
         self.core_mode = core_mode
         self.app_dir = app_options.app_dir
@@ -110,9 +109,10 @@ class Builder(object):
             return build(command='build', app_options=app_options)
 
 
-class BuildHandler(APIHandler):
+class BuildHandler(ExtensionHandlerMixin, APIHandler):
 
-    def initialize(self, builder):
+    def initialize(self, builder=None, name=None):
+        super(BuildHandler, self).initialize(name=name)
         self.builder = builder
 
     @web.authenticated

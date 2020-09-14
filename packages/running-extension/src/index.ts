@@ -1,36 +1,28 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
+import { toArray } from '@lumino/algorithm';
+
 import {
   ILayoutRestorer,
   JupyterFrontEnd,
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
+import { PathExt } from '@jupyterlab/coreutils';
 import {
   IRunningSessions,
   IRunningSessionManagers,
   RunningSessionManagers,
   RunningSessions
 } from '@jupyterlab/running';
-
 import { Session } from '@jupyterlab/services';
-import { PathExt } from '@jupyterlab/coreutils';
-import { toArray } from '@phosphor/algorithm';
-
-/**
- * The class name added to a notebook icon.
- */
-const NOTEBOOK_ICON_CLASS = 'jp-mod-notebook';
-
-/**
- * The class name added to a console icon.
- */
-const CONSOLE_ICON_CLASS = 'jp-mod-console';
-
-/**
- * The class name added to a file icon.
- */
-const FILE_ICON_CLASS = 'jp-mod-file';
+import { ITranslator } from '@jupyterlab/translation';
+import {
+  consoleIcon,
+  fileIcon,
+  notebookIcon,
+  runningIcon
+} from '@jupyterlab/ui-components';
 
 /**
  * The default running sessions extension.
@@ -39,6 +31,7 @@ const plugin: JupyterFrontEndPlugin<IRunningSessionManagers> = {
   activate,
   id: '@jupyterlab/running-extension:plugin',
   provides: IRunningSessionManagers,
+  requires: [ITranslator],
   optional: [ILayoutRestorer],
   autoStart: true
 };
@@ -53,13 +46,15 @@ export default plugin;
  */
 function activate(
   app: JupyterFrontEnd,
+  translator: ITranslator,
   restorer: ILayoutRestorer | null
 ): IRunningSessionManagers {
-  let runningSessionManagers = new RunningSessionManagers();
-  let running = new RunningSessions(runningSessionManagers);
+  const trans = translator.load('jupyterlab');
+  const runningSessionManagers = new RunningSessionManagers();
+  const running = new RunningSessions(runningSessionManagers, translator);
   running.id = 'jp-running-sessions';
-  running.title.iconClass = 'jp-RunningIcon jp-SideBar-tabIcon';
-  running.title.caption = 'Running Terminals and Kernels';
+  running.title.caption = trans.__('Running Terminals and Kernels');
+  running.title.icon = runningIcon;
 
   // Let the application restorer track the running panel for restoration of
   // application state (e.g. setting the running panel as the current side bar
@@ -67,7 +62,7 @@ function activate(
   if (restorer) {
     restorer.add(running, 'running-sessions');
   }
-  addKernelRunningSessionManager(runningSessionManagers, app);
+  addKernelRunningSessionManager(runningSessionManagers, translator, app);
   // Rank has been chosen somewhat arbitrarily to give priority to the running
   // sessions widget in the sidebar.
   app.shell.add(running, 'left', { rank: 200 });
@@ -80,9 +75,12 @@ function activate(
  */
 function addKernelRunningSessionManager(
   managers: IRunningSessionManagers,
+  translator: ITranslator,
   app: JupyterFrontEnd
 ) {
-  let manager = app.serviceManager.sessions;
+  const trans = translator.load('jupyterlab');
+  const manager = app.serviceManager.sessions;
+  const specsManager = app.serviceManager.kernelspecs;
   function filterSessions(m: Session.IModel) {
     return !!(
       (m.name || PathExt.basename(m.path)).indexOf('.') !== -1 || m.name
@@ -90,7 +88,7 @@ function addKernelRunningSessionManager(
   }
 
   managers.add({
-    name: 'Kernel',
+    name: trans.__('Kernels'),
     running: () => {
       return toArray(manager.running())
         .filter(filterSessions)
@@ -106,7 +104,7 @@ function addKernelRunningSessionManager(
       this._model = model;
     }
     open() {
-      let { path, type } = this._model;
+      const { path, type } = this._model;
       if (type.toLowerCase() === 'console') {
         void app.commands.execute('console:open', { path });
       } else {
@@ -116,26 +114,26 @@ function addKernelRunningSessionManager(
     shutdown() {
       return manager.shutdown(this._model.id);
     }
-    iconClass() {
-      let { name, path, type } = this._model;
+    icon() {
+      const { name, path, type } = this._model;
       if ((name || PathExt.basename(path)).indexOf('.ipynb') !== -1) {
-        return NOTEBOOK_ICON_CLASS;
+        return notebookIcon;
       } else if (type.toLowerCase() === 'console') {
-        return CONSOLE_ICON_CLASS;
+        return consoleIcon;
       }
-      return FILE_ICON_CLASS;
+      return fileIcon;
     }
     label() {
       return this._model.name || PathExt.basename(this._model.path);
     }
     labelTitle() {
-      let { kernel, path } = this._model;
-      let kernelName = kernel.name;
-      if (manager.specs) {
-        const spec = manager.specs.kernelspecs[kernelName];
+      const { kernel, path } = this._model;
+      let kernelName = kernel?.name;
+      if (kernelName && specsManager.specs) {
+        const spec = specsManager.specs.kernelspecs[kernelName];
         kernelName = spec ? spec.display_name : 'unknown';
       }
-      return `Path: ${path}\nKernel: ${kernelName}`;
+      return trans.__('Path: %1\nKernel: %2', path, kernelName);
     }
 
     private _model: Session.IModel;

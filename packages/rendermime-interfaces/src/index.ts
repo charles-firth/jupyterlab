@@ -1,10 +1,12 @@
-/*-----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
 | Copyright (c) Jupyter Development Team.
 | Distributed under the terms of the Modified BSD License.
 |----------------------------------------------------------------------------*/
-import { ReadonlyJSONObject } from '@phosphor/coreutils';
+import { ITranslator } from '@jupyterlab/translation';
 
-import { Widget } from '@phosphor/widgets';
+import { ReadonlyPartialJSONObject } from '@lumino/coreutils';
+
+import { Widget } from '@lumino/widgets';
 
 /**
  * A namespace for rendermime associated interfaces.
@@ -22,7 +24,7 @@ export namespace IRenderMime {
     /**
      * The data associated with the model.
      */
-    readonly data: ReadonlyJSONObject;
+    readonly data: ReadonlyPartialJSONObject;
 
     /**
      * The metadata associated with the model.
@@ -30,7 +32,7 @@ export namespace IRenderMime {
      * Among others, it can include an attribute named `fragment`
      * that stores a URI fragment identifier for the MIME resource.
      */
-    readonly metadata: ReadonlyJSONObject;
+    readonly metadata: ReadonlyPartialJSONObject;
 
     /**
      * Set the data associated with the model.
@@ -54,12 +56,12 @@ export namespace IRenderMime {
       /**
        * The new data object.
        */
-      data?: ReadonlyJSONObject;
+      data?: ReadonlyPartialJSONObject;
 
       /**
        * The new metadata object.
        */
-      metadata?: ReadonlyJSONObject;
+      metadata?: ReadonlyPartialJSONObject;
     }
   }
 
@@ -113,7 +115,41 @@ export namespace IRenderMime {
     /**
      * A function returning a list of toolbar items to add to the toolbar.
      */
-    readonly toolbarFactory?: (widget: IRenderer) => IToolbarItem[];
+    readonly toolbarFactory?: (widget?: IRenderer) => IToolbarItem[];
+  }
+
+  export namespace LabIcon {
+    /**
+     * The simplest possible interface for defining a generic icon.
+     */
+    export interface IIcon {
+      /**
+       * The name of the icon. By convention, the icon name will be namespaced
+       * as so:
+       *
+       *     "pkg-name:icon-name"
+       */
+      readonly name: string;
+
+      /**
+       * A string containing the raw contents of an svg file.
+       */
+      svgstr: string;
+    }
+
+    /**
+     * Interface for generic renderer.
+     */
+    export interface IRenderer {
+      readonly render: (container: HTMLElement, options?: any) => void;
+      // TODO: make unrenderer optional once @lumino/virtualdom > 1.4.1 is used
+      readonly unrender: (container: HTMLElement) => void;
+    }
+
+    /**
+     * A type that can be resolved to a LabIcon instance.
+     */
+    export type IResolvable = string | (IIcon & Partial<IRenderer>);
   }
 
   /**
@@ -145,6 +181,13 @@ export namespace IRenderMime {
      * An optional pattern for a file name (e.g. `^Dockerfile$`).
      */
     readonly pattern?: string;
+
+    /**
+     * The icon for the file type. Can either be a string containing the name
+     * of an existing icon, or an object with {name, svgstr} fields, where
+     * svgstr is a string containing the raw contents of an svg file.
+     */
+    readonly icon?: LabIcon.IResolvable;
 
     /**
      * The icon class name for the file type.
@@ -226,6 +269,11 @@ export namespace IRenderMime {
    */
   export interface IRenderer extends Widget {
     /**
+     * The application language translator.
+     */
+    translator?: ITranslator;
+
+    /**
      * Render a mime model.
      *
      * @param model - The mime model to render.
@@ -301,6 +349,11 @@ export namespace IRenderMime {
      * The LaTeX typesetter.
      */
     latexTypesetter: ILatexTypesetter | null;
+
+    /**
+     * The application language translator.
+     */
+    translator?: ITranslator;
   }
 
   /**

@@ -6,29 +6,46 @@ import { INotebookModel, Notebook } from '.';
 
 import { Cell } from '@jupyterlab/cells';
 
-import { DefaultIconReact } from '@jupyterlab/ui-components';
+import { notTrustedIcon, trustedIcon } from '@jupyterlab/ui-components';
 
-import { toArray } from '@phosphor/algorithm';
+import { toArray } from '@lumino/algorithm';
+import { nullTranslator, ITranslator } from '@jupyterlab/translation';
 
 /**
  * Determine the notebook trust status message.
  */
 function cellTrust(
-  props: NotebookTrustComponent.IProps | NotebookTrustStatus.Model
+  props: NotebookTrustComponent.IProps | NotebookTrustStatus.Model,
+  translator?: ITranslator
 ): string[] {
+  translator = translator || nullTranslator;
+  const trans = translator.load('jupyterlab');
+
   if (props.trustedCells === props.totalCells) {
     return [
-      `Notebook trusted: ${props.trustedCells} of ${props.totalCells} cells trusted.`,
+      trans.__(
+        'Notebook trusted: %1 of %2 cells trusted.',
+        props.trustedCells,
+        props.totalCells
+      ),
       'jp-StatusItem-trusted'
     ];
   } else if (props.activeCellTrusted) {
     return [
-      `Active cell trusted: ${props.trustedCells} of ${props.totalCells} cells trusted. `,
+      trans.__(
+        'Active cell trusted: %1 of %2 cells trusted.',
+        props.trustedCells,
+        props.totalCells
+      ),
       'jp-StatusItem-trusted'
     ];
   } else {
     return [
-      `Notebook not trusted: ${props.trustedCells} of ${props.totalCells} cells trusted.`,
+      trans.__(
+        'Notebook not trusted: %1 of %2 cells trusted.',
+        props.trustedCells,
+        props.totalCells
+      ),
       'jp-StatusItem-untrusted'
     ];
   }
@@ -45,11 +62,9 @@ function NotebookTrustComponent(
   props: NotebookTrustComponent.IProps
 ): React.ReactElement<NotebookTrustComponent.IProps> {
   if (props.allCellsTrusted) {
-    return <DefaultIconReact name="trusted" top={'2px'} kind={'statusBar'} />;
+    return <trustedIcon.react top={'2px'} stylesheet={'statusBar'} />;
   } else {
-    return (
-      <DefaultIconReact name="not-trusted" top={'2px'} kind={'statusBar'} />
-    );
+    return <notTrustedIcon.react top={'2px'} stylesheet={'statusBar'} />;
   }
 }
 
@@ -92,9 +107,9 @@ export class NotebookTrustStatus extends VDomRenderer<
   /**
    * Construct a new status item.
    */
-  constructor() {
-    super();
-    this.model = new NotebookTrustStatus.Model();
+  constructor(translator?: ITranslator) {
+    super(new NotebookTrustStatus.Model());
+    this.translator = translator || nullTranslator;
   }
 
   /**
@@ -104,7 +119,7 @@ export class NotebookTrustStatus extends VDomRenderer<
     if (!this.model) {
       return null;
     }
-    this.node.title = cellTrust(this.model)[0];
+    this.node.title = cellTrust(this.model, this.translator)[0];
     return (
       <div>
         <NotebookTrustComponent
@@ -116,6 +131,8 @@ export class NotebookTrustStatus extends VDomRenderer<
       </div>
     );
   }
+
+  translator: ITranslator;
 }
 
 /**
@@ -225,11 +242,14 @@ export namespace NotebookTrustStatus {
      * Given a notebook model, figure out how many of the cells are trusted.
      */
     private _deriveCellTrustState(
-      model: INotebookModel
+      model: INotebookModel | null
     ): { total: number; trusted: number } {
-      let cells = toArray(model.cells);
+      if (model === null) {
+        return { total: 0, trusted: 0 };
+      }
+      const cells = toArray(model.cells);
 
-      let trusted = cells.reduce((accum, current) => {
+      const trusted = cells.reduce((accum, current) => {
         if (current.trusted) {
           return accum + 1;
         } else {
@@ -237,7 +257,7 @@ export namespace NotebookTrustStatus {
         }
       }, 0);
 
-      let total = cells.length;
+      const total = cells.length;
 
       return {
         total,

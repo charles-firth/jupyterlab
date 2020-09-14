@@ -1,4 +1,4 @@
-/*-----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
 | Copyright (c) Jupyter Development Team.
 | Distributed under the terms of the Modified BSD License.
 |----------------------------------------------------------------------------*/
@@ -71,7 +71,7 @@ export const textRendererFactory: IRenderMime.IRendererFactory = {
 };
 
 /**
- * A placeholder factory for deprecated rendered JavaScript.
+ * A placeholder factory for rendered JavaScript.
  */
 export const javaScriptRendererFactory: IRenderMime.IRendererFactory = {
   safe: false,

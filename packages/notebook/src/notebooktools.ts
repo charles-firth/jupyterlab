@@ -1,15 +1,18 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { ArrayExt, each, chain } from '@phosphor/algorithm';
+import { ArrayExt, each, chain } from '@lumino/algorithm';
 
-import { JSONObject, JSONValue } from '@phosphor/coreutils';
+import {
+  ReadonlyPartialJSONValue,
+  ReadonlyPartialJSONObject
+} from '@lumino/coreutils';
 
-import { ConflatableMessage, Message, MessageLoop } from '@phosphor/messaging';
+import { ConflatableMessage, Message, MessageLoop } from '@lumino/messaging';
 
-import { h, VirtualDOM, VirtualNode } from '@phosphor/virtualdom';
+import { h, VirtualDOM, VirtualNode } from '@lumino/virtualdom';
 
-import { PanelLayout, Widget } from '@phosphor/widgets';
+import { PanelLayout, Widget } from '@lumino/widgets';
 
 import { Collapse, Styling } from '@jupyterlab/apputils';
 
@@ -21,9 +24,15 @@ import {
   JSONEditor
 } from '@jupyterlab/codeeditor';
 
-import { nbformat } from '@jupyterlab/coreutils';
+import * as nbformat from '@jupyterlab/nbformat';
 
 import { IObservableMap, ObservableJSON } from '@jupyterlab/observables';
+
+import {
+  nullTranslator,
+  ITranslator,
+  TranslationBundle
+} from '@jupyterlab/translation';
 
 import { NotebookPanel } from './panel';
 import { INotebookModel } from './model';
@@ -50,7 +59,7 @@ class RankedPanel<T extends Widget = Widget> extends Widget {
    *
    */
   protected onChildRemoved(msg: Widget.ChildMessage): void {
-    let index = ArrayExt.findFirstIndex(
+    const index = ArrayExt.findFirstIndex(
       this._items,
       item => item.widget === msg.child
     );
@@ -73,9 +82,11 @@ export class NotebookTools extends Widget implements INotebookTools {
     super();
     this.addClass('jp-NotebookTools');
 
+    this.translator = options.translator || nullTranslator;
+    this._trans = this.translator.load('jupyterlab');
     this._commonTools = new RankedPanel<NotebookTools.Tool>();
     this._advancedTools = new RankedPanel<NotebookTools.Tool>();
-    this._advancedTools.title.label = 'Advanced Tools';
+    this._advancedTools.title.label = this._trans.__('Advanced Tools');
 
     const layout = (this.layout = new PanelLayout());
     layout.addWidget(this._commonTools);
@@ -123,8 +134,8 @@ export class NotebookTools extends Widget implements INotebookTools {
    * Add a cell tool item.
    */
   addItem(options: NotebookTools.IAddOptions): void {
-    let tool = options.tool;
-    let rank = 'rank' in options ? options.rank : 100;
+    const tool = options.tool;
+    const rank = options.rank ?? 100;
 
     let section: RankedPanel<NotebookTools.Tool>;
     if (options.section === 'advanced') {
@@ -209,10 +220,10 @@ export class NotebookTools extends Widget implements INotebookTools {
    * Handle a change in the active cell metadata.
    */
   private _onActiveNotebookPanelMetadataChanged(
-    sender: IObservableMap<JSONValue>,
-    args: IObservableMap.IChangedArgs<JSONValue>
+    sender: IObservableMap<ReadonlyPartialJSONValue | undefined>,
+    args: IObservableMap.IChangedArgs<ReadonlyPartialJSONValue>
   ): void {
-    let message = new ObservableJSON.ChangeMessage(
+    const message = new ObservableJSON.ChangeMessage(
       'activenotebookpanel-metadata-changed',
       args
     );
@@ -225,10 +236,10 @@ export class NotebookTools extends Widget implements INotebookTools {
    * Handle a change in the notebook model metadata.
    */
   private _onActiveCellMetadataChanged(
-    sender: IObservableMap<JSONValue>,
-    args: IObservableMap.IChangedArgs<JSONValue>
+    sender: IObservableMap<ReadonlyPartialJSONValue | undefined>,
+    args: IObservableMap.IChangedArgs<ReadonlyPartialJSONValue>
   ): void {
-    let message = new ObservableJSON.ChangeMessage(
+    const message = new ObservableJSON.ChangeMessage(
       'activecell-metadata-changed',
       args
     );
@@ -241,6 +252,8 @@ export class NotebookTools extends Widget implements INotebookTools {
     return chain(this._commonTools.children(), this._advancedTools.children());
   }
 
+  translator: ITranslator;
+  private _trans: TranslationBundle;
   private _commonTools: RankedPanel<NotebookTools.Tool>;
   private _advancedTools: RankedPanel<NotebookTools.Tool>;
   private _tracker: INotebookTracker;
@@ -253,6 +266,17 @@ export class NotebookTools extends Widget implements INotebookTools {
  */
 export namespace NotebookTools {
   /**
+   * A type alias for a readonly partial JSON tuples `[option, value]`.
+   * `option` should be localized.
+   *
+   * Note: Partial here means that JSON object attributes can be `undefined`.
+   */
+  export type ReadonlyPartialJSONOptionValueArray = [
+    ReadonlyPartialJSONValue | undefined,
+    ReadonlyPartialJSONValue
+  ][];
+
+  /**
    * The options used to create a NotebookTools object.
    */
   export interface IOptions {
@@ -260,6 +284,11 @@ export namespace NotebookTools {
      * The notebook tracker used by the notebook tools.
      */
     tracker: INotebookTracker;
+
+    /**
+     * Language translator.
+     */
+    translator?: ITranslator;
   }
 
   /**
@@ -310,7 +339,9 @@ export namespace NotebookTools {
 
     dispose() {
       super.dispose();
-      this.notebookTools = null;
+      if (this.notebookTools) {
+        this.notebookTools = null!;
+      }
     }
 
     /**
@@ -420,7 +451,7 @@ export namespace NotebookTools {
         return;
       }
       this._model.dispose();
-      this._model = null;
+      this._model = null!;
       super.dispose();
     }
 
@@ -428,9 +459,9 @@ export namespace NotebookTools {
      * Handle a change to the active cell.
      */
     protected onActiveCellChanged(): void {
-      let activeCell = this.notebookTools.activeCell;
-      let layout = this.layout as PanelLayout;
-      let count = layout.widgets.length;
+      const activeCell = this.notebookTools.activeCell;
+      const layout = this.layout as PanelLayout;
+      const count = layout.widgets.length;
       for (let i = 0; i < count; i++) {
         layout.widgets[0].dispose();
       }
@@ -442,27 +473,27 @@ export namespace NotebookTools {
         );
       }
       if (!activeCell) {
-        let cell = new Widget();
+        const cell = new Widget();
         cell.addClass('jp-InputArea-editor');
         cell.addClass('jp-InputArea-editor');
         layout.addWidget(cell);
         this._cellModel = null;
         return;
       }
-      let promptNode = activeCell.promptNode
+      const promptNode = activeCell.promptNode
         ? (activeCell.promptNode.cloneNode(true) as HTMLElement)
-        : null;
-      let prompt = new Widget({ node: promptNode });
-      let factory = activeCell.contentFactory.editorFactory;
+        : undefined;
+      const prompt = new Widget({ node: promptNode });
+      const factory = activeCell.contentFactory.editorFactory;
 
-      let cellModel = (this._cellModel = activeCell.model);
+      const cellModel = (this._cellModel = activeCell.model);
       cellModel.value.changed.connect(this._onValueChanged, this);
       cellModel.mimeTypeChanged.connect(this._onMimeTypeChanged, this);
       this._model.value.text = cellModel.value.text.split('\n')[0];
       this._model.mimeType = cellModel.mimeType;
 
-      let model = this._model;
-      let editorWidget = new CodeEditorWrapper({ model, factory });
+      const model = this._model;
+      const editorWidget = new CodeEditorWrapper({ model, factory });
       editorWidget.addClass('jp-InputArea-editor');
       editorWidget.addClass('jp-InputArea-editor');
       editorWidget.editor.setOption('readOnly', true);
@@ -474,18 +505,18 @@ export namespace NotebookTools {
      * Handle a change to the current editor value.
      */
     private _onValueChanged(): void {
-      this._model.value.text = this._cellModel.value.text.split('\n')[0];
+      this._model.value.text = this._cellModel!.value.text.split('\n')[0];
     }
 
     /**
      * Handle a change to the current editor mimetype.
      */
     private _onMimeTypeChanged(): void {
-      this._model.mimeType = this._cellModel.mimeType;
+      this._model.mimeType = this._cellModel!.mimeType;
     }
 
     private _model = new CodeEditor.Model();
-    private _cellModel: CodeEditor.IModel;
+    private _cellModel: CodeEditor.IModel | null;
   }
 
   /**
@@ -499,7 +530,7 @@ export namespace NotebookTools {
       super();
       const { editorFactory } = options;
       this.addClass('jp-MetadataEditorTool');
-      let layout = (this.layout = new PanelLayout());
+      const layout = (this.layout = new PanelLayout());
       this.editor = new JSONEditor({
         editorFactory
       });
@@ -538,6 +569,11 @@ export namespace NotebookTools {
        * Initial collapse state, defaults to true.
        */
       collapsed?: boolean;
+
+      /**
+       * Language translator.
+       */
+      translator?: ITranslator;
     }
   }
 
@@ -546,7 +582,9 @@ export namespace NotebookTools {
    */
   export class NotebookMetadataEditorTool extends MetadataEditorTool {
     constructor(options: MetadataEditorTool.IOptions) {
-      options.label = options.label || 'Notebook Metadata';
+      const translator = options.translator || nullTranslator;
+      const trans = translator.load('jupyterlab');
+      options.label = options.label || trans.__('Notebook Metadata');
       super(options);
     }
 
@@ -568,7 +606,7 @@ export namespace NotebookTools {
       const nb =
         this.notebookTools.activeNotebookPanel &&
         this.notebookTools.activeNotebookPanel.content;
-      this.editor.source = nb ? nb.model.metadata : null;
+      this.editor.source = nb?.model?.metadata ?? null;
     }
   }
 
@@ -577,7 +615,9 @@ export namespace NotebookTools {
    */
   export class CellMetadataEditorTool extends MetadataEditorTool {
     constructor(options: MetadataEditorTool.IOptions) {
-      options.label = options.label || 'Cell Metadata';
+      const translator = options.translator || nullTranslator;
+      const trans = translator.load('jupyterlab');
+      options.label = options.label || trans.__('Cell Metadata');
       super(options);
     }
 
@@ -596,7 +636,7 @@ export namespace NotebookTools {
     }
 
     private _update() {
-      let cell = this.notebookTools.activeCell;
+      const cell = this.notebookTools.activeCell;
       this.editor.source = cell ? cell.model.metadata : null;
     }
   }
@@ -655,7 +695,7 @@ export namespace NotebookTools {
      * Handle `after-attach` messages for the widget.
      */
     protected onAfterAttach(msg: Message): void {
-      let node = this.selectNode;
+      const node = this.selectNode;
       node.addEventListener('change', this);
     }
 
@@ -663,7 +703,7 @@ export namespace NotebookTools {
      * Handle `before-detach` messages for the widget.
      */
     protected onBeforeDetach(msg: Message): void {
-      let node = this.selectNode;
+      const node = this.selectNode;
       node.removeEventListener('change', this);
     }
 
@@ -671,25 +711,25 @@ export namespace NotebookTools {
      * Handle a change to the active cell.
      */
     protected onActiveCellChanged(msg: Message): void {
-      let select = this.selectNode;
-      let activeCell = this.notebookTools.activeCell;
+      const select = this.selectNode;
+      const activeCell = this.notebookTools.activeCell;
       if (!activeCell) {
         select.disabled = true;
         select.value = '';
         return;
       }
-      let cellType = activeCell.model.type;
+      const cellType = activeCell.model.type;
       if (
         this._validCellTypes.length &&
         this._validCellTypes.indexOf(cellType) === -1
       ) {
-        select.value = undefined;
+        select.value = '';
         select.disabled = true;
         return;
       }
       select.disabled = false;
       this._changeGuard = true;
-      let getter = this._getter;
+      const getter = this._getter;
       select.value = JSON.stringify(getter(activeCell));
       this._changeGuard = false;
     }
@@ -701,11 +741,11 @@ export namespace NotebookTools {
       if (this._changeGuard) {
         return;
       }
-      let select = this.selectNode;
-      let cell = this.notebookTools.activeCell;
+      const select = this.selectNode;
+      const cell = this.notebookTools.activeCell;
       if (msg.args.key === this.key && cell) {
         this._changeGuard = true;
-        let getter = this._getter;
+        const getter = this._getter;
         select.value = JSON.stringify(getter(cell));
         this._changeGuard = false;
       }
@@ -715,13 +755,13 @@ export namespace NotebookTools {
      * Handle a change to the value.
      */
     protected onValueChanged(): void {
-      let activeCell = this.notebookTools.activeCell;
+      const activeCell = this.notebookTools.activeCell;
       if (!activeCell || this._changeGuard) {
         return;
       }
       this._changeGuard = true;
-      let select = this.selectNode;
-      let setter = this._setter;
+      const select = this.selectNode;
+      const setter = this._setter;
       setter(activeCell, JSON.parse(select.value));
       this._changeGuard = false;
     }
@@ -740,7 +780,10 @@ export namespace NotebookTools {
     /**
      * Set the value for the data.
      */
-    private _setValue = (cell: Cell, value: JSONValue) => {
+    private _setValue = (
+      cell: Cell,
+      value: ReadonlyPartialJSONValue | undefined
+    ) => {
       if (value === this._default) {
         cell.model.metadata.delete(this.key);
       } else {
@@ -750,9 +793,12 @@ export namespace NotebookTools {
 
     private _changeGuard = false;
     private _validCellTypes: string[];
-    private _getter: (cell: Cell) => JSONValue;
-    private _setter: (cell: Cell, value: JSONValue) => void;
-    private _default: JSONValue;
+    private _getter: (cell: Cell) => ReadonlyPartialJSONValue | undefined;
+    private _setter: (
+      cell: Cell,
+      value: ReadonlyPartialJSONValue | undefined
+    ) => void;
+    private _default: ReadonlyPartialJSONValue | undefined;
   }
 
   /**
@@ -769,18 +815,23 @@ export namespace NotebookTools {
       key: string;
 
       /**
-       * The map of options to values.
+       * The map of values to options.
+       *
+       * Value corresponds to the unique identifier.
+       * Option corresponds to the localizable value to display.
+       *
+       * See: `<option value="volvo">Volvo</option>`
        *
        * #### Notes
        * If a value equals the default, choosing it may erase the key from the
        * metadata.
        */
-      optionsMap: { [key: string]: JSONValue };
+      optionValueArray: ReadonlyPartialJSONOptionValueArray;
 
       /**
        * The optional title of the selector - defaults to capitalized `key`.
        */
-      title?: string;
+      title: string;
 
       /**
        * The optional valid cell types - defaults to all valid types.
@@ -794,7 +845,7 @@ export namespace NotebookTools {
        *
        * @returns The appropriate value for the selector.
        */
-      getter?: (cell: Cell) => JSONValue;
+      getter?: (cell: Cell) => ReadonlyPartialJSONValue | undefined;
 
       /**
        * An optional value setter for the selector.
@@ -807,33 +858,43 @@ export namespace NotebookTools {
        * The setter should set the appropriate metadata value given the value of
        * the selector.
        */
-      setter?: (cell: Cell, value: JSONValue) => void;
+      setter?: (
+        cell: Cell,
+        value: ReadonlyPartialJSONValue | undefined
+      ) => void;
 
       /**
        * Default value for default setters and getters if value is not found.
        */
-      default?: JSONValue;
+      default?: ReadonlyPartialJSONValue;
     }
   }
 
   /**
    * Create a slideshow selector.
    */
-  export function createSlideShowSelector(): KeySelector {
-    let options: KeySelector.IOptions = {
+  export function createSlideShowSelector(
+    translator?: ITranslator
+  ): KeySelector {
+    translator = translator || nullTranslator;
+    const trans = translator.load('jupyterlab');
+    trans.__('');
+    const options: KeySelector.IOptions = {
       key: 'slideshow',
-      title: 'Slide Type',
-      optionsMap: {
-        '-': null,
-        Slide: 'slide',
-        'Sub-Slide': 'subslide',
-        Fragment: 'fragment',
-        Skip: 'skip',
-        Notes: 'notes'
-      },
+      title: trans.__('Slide Type'),
+      optionValueArray: [
+        ['-', null],
+        [trans.__('Slide'), 'slide'],
+        [trans.__('Sub-Slide'), 'subslide'],
+        [trans.__('Fragment'), 'fragment'],
+        [trans.__('Skip'), 'skip'],
+        [trans.__('Notes'), 'notes']
+      ],
       getter: cell => {
-        let value = cell.model.metadata.get('slideshow');
-        return value && (value as JSONObject)['slide_type'];
+        const value = cell.model.metadata.get('slideshow') as
+          | ReadonlyPartialJSONObject
+          | undefined;
+        return value && value['slide_type'];
       },
       setter: (cell, value) => {
         let data = cell.model.metadata.get('slideshow') || Object.create(null);
@@ -857,13 +918,16 @@ export namespace NotebookTools {
   /**
    * Create an nbconvert selector.
    */
-  export function createNBConvertSelector(optionsMap: {
-    [key: string]: JSONValue;
-  }): KeySelector {
+  export function createNBConvertSelector(
+    optionValueArray: ReadonlyPartialJSONOptionValueArray,
+    translator?: ITranslator
+  ): KeySelector {
+    translator = translator || nullTranslator;
+    const trans = translator.load('jupyterlab');
     return new KeySelector({
       key: 'raw_mimetype',
-      title: 'Raw NBConvert Format',
-      optionsMap: optionsMap,
+      title: trans.__('Raw NBConvert Format'),
+      optionValueArray: optionValueArray,
       validCellTypes: ['raw']
     });
   }
@@ -901,14 +965,17 @@ namespace Private {
   export function createSelectorNode(
     options: NotebookTools.KeySelector.IOptions
   ): HTMLElement {
-    let name = options.key;
-    let title = options.title || name[0].toLocaleUpperCase() + name.slice(1);
-    let optionNodes: VirtualNode[] = [];
-    for (let label in options.optionsMap) {
-      let value = JSON.stringify(options.optionsMap[label]);
-      optionNodes.push(h.option({ value }, label));
-    }
-    let node = VirtualDOM.realize(
+    const name = options.key;
+    const title = options.title || name[0].toLocaleUpperCase() + name.slice(1);
+    const optionNodes: VirtualNode[] = [];
+    let value: any;
+    let option: any;
+    each(options.optionValueArray, item => {
+      option = item[0];
+      value = JSON.stringify(item[1]);
+      optionNodes.push(h.option({ value }, option));
+    });
+    const node = VirtualDOM.realize(
       h.div({}, h.label(title, h.select({}, optionNodes)))
     );
     Styling.styleNode(node);

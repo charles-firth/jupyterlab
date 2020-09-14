@@ -11,11 +11,17 @@ import {
   MimeModel
 } from '@jupyterlab/rendermime';
 
-import { JSONObject, PromiseDelegate, JSONExt } from '@phosphor/coreutils';
+import {
+  nullTranslator,
+  ITranslator,
+  TranslationBundle
+} from '@jupyterlab/translation';
 
-import { Message, MessageLoop } from '@phosphor/messaging';
+import { PromiseDelegate, JSONExt, PartialJSONObject } from '@lumino/coreutils';
 
-import { StackedLayout, Widget } from '@phosphor/widgets';
+import { Message, MessageLoop } from '@lumino/messaging';
+
+import { StackedLayout, Widget } from '@lumino/widgets';
 
 import { ABCWidgetFactory, DocumentWidget } from './default';
 
@@ -31,6 +37,8 @@ export class MimeContent extends Widget {
   constructor(options: MimeContent.IOptions) {
     super();
     this.addClass('jp-MimeDocument');
+    this.translator = options.translator || nullTranslator;
+    this._trans = this.translator.load('jupyterlab');
     this.mimeType = options.mimeType;
     this._dataType = options.dataType || 'string';
     this._context = options.context;
@@ -67,7 +75,7 @@ export class MimeContent extends Widget {
           this.dispose();
         });
         void showErrorMessage(
-          `Renderer Failure: ${this._context.path}`,
+          this._trans.__('Renderer Failure: %1', this._context.path),
           reason
         );
       });
@@ -141,15 +149,15 @@ export class MimeContent extends Widget {
 
     // Set up for this rendering pass.
     this._renderRequested = false;
-    let context = this._context;
-    let model = context.model;
-    let data: JSONObject = {};
+    const context = this._context;
+    const model = context.model;
+    const data: PartialJSONObject = {};
     if (this._dataType === 'string') {
       data[this.mimeType] = model.toString();
     } else {
       data[this.mimeType] = model.toJSON();
     }
-    let mimeModel = new MimeModel({
+    const mimeModel = new MimeModel({
       data,
       callback: this._changeCallback,
       metadata: { fragment: this._fragment }
@@ -170,7 +178,10 @@ export class MimeContent extends Widget {
       requestAnimationFrame(() => {
         this.dispose();
       });
-      void showErrorMessage(`Renderer Failure: ${context.path}`, reason);
+      void showErrorMessage(
+        this._trans.__('Renderer Failure: %1', context.path),
+        reason
+      );
     }
   }
 
@@ -183,20 +194,24 @@ export class MimeContent extends Widget {
     if (!options.data || !options.data[this.mimeType]) {
       return;
     }
-    let data = options.data[this.mimeType];
+    const data = options.data[this.mimeType];
     if (typeof data === 'string') {
       if (data !== this._context.model.toString()) {
         this._context.model.fromString(data);
       }
-    } else {
-      if (!JSONExt.deepEqual(data, this._context.model.toJSON())) {
-        this._context.model.fromJSON(data);
-      }
+    } else if (
+      data !== null &&
+      data !== undefined &&
+      !JSONExt.deepEqual(data, this._context.model.toJSON())
+    ) {
+      this._context.model.fromJSON(data);
     }
   };
 
   readonly renderer: IRenderMime.IRenderer;
 
+  protected translator: ITranslator;
+  private _trans: TranslationBundle;
   private _context: DocumentRegistry.IContext<DocumentRegistry.IModel>;
   private _fragment = '';
   private _monitor: ActivityMonitor<DocumentRegistry.IModel, void> | null;
@@ -238,6 +253,11 @@ export namespace MimeContent {
      * Preferred data type from the model.
      */
     dataType?: 'string' | 'json';
+
+    /**
+     * The application language translator.
+     */
+    translator?: ITranslator;
   }
 }
 
@@ -270,7 +290,7 @@ export class MimeDocumentFactory extends ABCWidgetFactory<MimeDocument> {
    */
   protected createNewWidget(context: DocumentRegistry.Context): MimeDocument {
     const ft = this._fileType;
-    const mimeType = ft.mimeTypes.length ? ft.mimeTypes[0] : 'text/plain';
+    const mimeType = ft?.mimeTypes.length ? ft.mimeTypes[0] : 'text/plain';
 
     const rendermime = this._rendermime.clone({
       resolver: context.urlResolver
@@ -285,8 +305,9 @@ export class MimeDocumentFactory extends ABCWidgetFactory<MimeDocument> {
       dataType: this._dataType
     });
 
-    content.title.iconClass = ft.iconClass;
-    content.title.iconLabel = ft.iconLabel;
+    content.title.icon = ft?.icon!;
+    content.title.iconClass = ft?.iconClass ?? '';
+    content.title.iconLabel = ft?.iconLabel ?? '';
 
     const widget = new MimeDocument({ content, context });
 
@@ -296,7 +317,7 @@ export class MimeDocumentFactory extends ABCWidgetFactory<MimeDocument> {
   private _rendermime: IRenderMimeRegistry;
   private _renderTimeout: number;
   private _dataType: 'string' | 'json';
-  private _fileType: DocumentRegistry.IFileType;
+  private _fileType: DocumentRegistry.IFileType | undefined;
 }
 
 /**
@@ -311,7 +332,7 @@ export namespace MimeDocumentFactory {
     /**
      * The primary file type associated with the document.
      */
-    primaryFileType: DocumentRegistry.IFileType;
+    primaryFileType: DocumentRegistry.IFileType | undefined;
 
     /**
      * The rendermime instance.

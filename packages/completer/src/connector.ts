@@ -1,7 +1,7 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { DataConnector } from '@jupyterlab/coreutils';
+import { DataConnector } from '@jupyterlab/statedb';
 
 import { KernelConnector } from './kernelconnector';
 
@@ -93,7 +93,7 @@ namespace Private {
     const memo = matches.reduce((acc, val) => {
       acc[val] = null;
       return acc;
-    }, {} as { [key: string]: string });
+    }, {} as { [key: string]: string | null });
 
     // Add each context match that is not in the memo to the result.
     context.matches.forEach(match => {

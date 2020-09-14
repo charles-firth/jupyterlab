@@ -3,7 +3,7 @@
 
 import { Kernel } from '@jupyterlab/services';
 
-import { Menu, Widget } from '@phosphor/widgets';
+import { Menu, Widget } from '@lumino/widgets';
 
 import { IJupyterLabMenu, IMenuExtender, JupyterLabMenu } from './labmenu';
 
@@ -28,7 +28,6 @@ export class HelpMenu extends JupyterLabMenu implements IHelpMenu {
    */
   constructor(options: Menu.IOptions) {
     super(options);
-    this.menu.title.label = 'Help';
     this.kernelUsers = new Set<IHelpMenu.IKernelUser<Widget>>();
   }
 

@@ -19,13 +19,16 @@
       "path": "../codemirror"
     },
     {
-      "path": "../coreutils"
-    },
-    {
       "path": "../fileeditor"
     },
     {
       "path": "../notebook"
+    },
+    {
+      "path": "../translation"
+    },
+    {
+      "path": "../ui-components"
     }
   ]
 }

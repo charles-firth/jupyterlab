@@ -1,7 +1,7 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { Menu } from '@phosphor/widgets';
+import { Menu } from '@lumino/widgets';
 
 import { IJupyterLabMenu, JupyterLabMenu } from './labmenu';
 
@@ -19,6 +19,5 @@ export class TabsMenu extends JupyterLabMenu implements ITabsMenu {
    */
   constructor(options: Menu.IOptions) {
     super(options);
-    this.menu.title.label = 'Tabs';
   }
 }

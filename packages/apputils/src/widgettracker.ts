@@ -1,13 +1,13 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { IRestorable, RestorablePool } from '@jupyterlab/coreutils';
+import { IRestorable, RestorablePool } from '@jupyterlab/statedb';
 
-import { IDisposable } from '@phosphor/disposable';
+import { IDisposable } from '@lumino/disposable';
 
-import { ISignal, Signal } from '@phosphor/signaling';
+import { ISignal, Signal } from '@lumino/signaling';
 
-import { FocusTracker, Widget } from '@phosphor/widgets';
+import { FocusTracker, Widget } from '@lumino/widgets';
 
 /**
  * A tracker that tracks widgets.
@@ -142,6 +142,7 @@ export class WidgetTracker<T extends Widget = Widget>
         pool.current = focus.currentWidget;
         return;
       }
+
       this.onCurrentChanged(widget);
       this._currentChanged.emit(widget);
     }, this);
@@ -216,11 +217,16 @@ export class WidgetTracker<T extends Widget = Widget>
    * the tracker can be checked with the `has()` method. The promise this method
    * returns resolves after the widget has been added and saved to an underlying
    * restoration connector, if one is available.
+   *
+   * The newly added widget becomes the current widget unless the focus tracker
+   * already had a focused widget.
    */
   async add(widget: T): Promise<void> {
     this._focusTracker.add(widget);
     await this._pool.add(widget);
-    this._pool.current = widget;
+    if (!this._focusTracker.activeWidget) {
+      this._pool.current = widget;
+    }
   }
 
   /**
@@ -336,7 +342,7 @@ export class WidgetTracker<T extends Widget = Widget>
     /* no-op */
   }
 
-  private _currentChanged = new Signal<this, T>(this);
+  private _currentChanged = new Signal<this, T | null>(this);
   private _focusTracker: FocusTracker<T>;
   private _pool: RestorablePool<T>;
   private _isDisposed = false;

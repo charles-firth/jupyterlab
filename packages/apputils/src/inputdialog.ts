@@ -1,7 +1,7 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { Widget } from '@phosphor/widgets';
+import { Widget } from '@lumino/widgets';
 
 import { Dialog, showDialog } from './dialog';
 import { Styling } from './styling';
@@ -190,6 +190,27 @@ export namespace InputDialog {
       focusNodeSelector: 'input'
     });
   }
+
+  /**
+   * Create and show a input dialog for a password.
+   *
+   * @param options - The dialog setup options.
+   *
+   * @returns A promise that resolves with whether the dialog was accepted
+   */
+  export function getPassword(
+    options: ITextOptions
+  ): Promise<Dialog.IResult<string>> {
+    return showDialog({
+      ...options,
+      body: new InputPasswordDialog(options),
+      buttons: [
+        Dialog.cancelButton({ label: options.cancelLabel }),
+        Dialog.okButton({ label: options.okLabel })
+      ],
+      focusNodeSelector: 'input'
+    });
+  }
 }
 
 /**
@@ -206,7 +227,7 @@ class InputDialogBase<T> extends Widget implements Dialog.IBodyWidget<T> {
     this.addClass(INPUT_DIALOG_CLASS);
 
     if (label !== undefined) {
-      let labelElement = document.createElement('label');
+      const labelElement = document.createElement('label');
       labelElement.textContent = label;
 
       // Initialize the node
@@ -313,6 +334,38 @@ class InputTextDialog extends InputDialogBase<string> {
 }
 
 /**
+ * Widget body for input password dialog
+ */
+class InputPasswordDialog extends InputDialogBase<string> {
+  /**
+   * InputPasswordDialog constructor
+   *
+   * @param options Constructor options
+   */
+  constructor(options: InputDialog.ITextOptions) {
+    super(options.label);
+
+    this._input = document.createElement('input', {});
+    this._input.classList.add('jp-mod-styled');
+    this._input.type = 'password';
+    this._input.value = options.text ? options.text : '';
+    if (options.placeholder) {
+      this._input.placeholder = options.placeholder;
+    }
+
+    // Initialize the node
+    this.node.appendChild(this._input);
+  }
+
+  /**
+   * Get the text specified by the user
+   */
+  getValue(): string {
+    return this._input.value;
+  }
+}
+
+/**
  * Widget body for input list dialog
  */
 class InputItemsDialog extends InputDialogBase<string> {
@@ -335,7 +388,7 @@ class InputItemsDialog extends InputDialogBase<string> {
 
     this._list = document.createElement('select');
     options.items.forEach((item, index) => {
-      let option = document.createElement('option');
+      const option = document.createElement('option');
       if (index === defaultIndex) {
         option.selected = true;
         current = item;
@@ -347,7 +400,7 @@ class InputItemsDialog extends InputDialogBase<string> {
 
     if (options.editable) {
       /* Use of list and datalist */
-      let data = document.createElement('datalist');
+      const data = document.createElement('datalist');
       data.id = 'input-dialog-items';
       data.appendChild(this._list);
 

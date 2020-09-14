@@ -3,11 +3,11 @@
 
 import { IWidgetTracker } from '@jupyterlab/apputils';
 
-import { ArrayExt } from '@phosphor/algorithm';
+import { ArrayExt } from '@lumino/algorithm';
 
-import { DisposableDelegate, IDisposable } from '@phosphor/disposable';
+import { DisposableDelegate, IDisposable } from '@lumino/disposable';
 
-import { Menu, Widget } from '@phosphor/widgets';
+import { Menu, Widget } from '@lumino/widgets';
 
 /**
  * A common interface for extensible JupyterLab application menus.
@@ -107,7 +107,7 @@ export class JupyterLabMenu implements IJupyterLabMenu {
       added.push(this.menu.insertItem(insertIndex++, { type: 'separator' }));
     }
     // Insert the group.
-    for (let item of items) {
+    for (const item of items) {
       added.push(this.menu.insertItem(insertIndex++, item));
     }
     // Insert a separator after the group.

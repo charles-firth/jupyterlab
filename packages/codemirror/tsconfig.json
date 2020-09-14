@@ -16,10 +16,16 @@
       "path": "../coreutils"
     },
     {
+      "path": "../nbformat"
+    },
+    {
       "path": "../observables"
     },
     {
       "path": "../statusbar"
+    },
+    {
+      "path": "../translation"
     }
   ]
 }

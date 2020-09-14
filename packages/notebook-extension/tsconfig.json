@@ -31,10 +31,19 @@
       "path": "../launcher"
     },
     {
+      "path": "../logconsole"
+    },
+    {
       "path": "../mainmenu"
     },
     {
+      "path": "../nbformat"
+    },
+    {
       "path": "../notebook"
+    },
+    {
+      "path": "../property-inspector"
     },
     {
       "path": "../rendermime"
@@ -43,7 +52,19 @@
       "path": "../services"
     },
     {
+      "path": "../settingregistry"
+    },
+    {
+      "path": "../statedb"
+    },
+    {
       "path": "../statusbar"
+    },
+    {
+      "path": "../translation"
+    },
+    {
+      "path": "../ui-components"
     }
   ]
 }

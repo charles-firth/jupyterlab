@@ -9,7 +9,9 @@ import re
 
 from concurrent.futures import ThreadPoolExecutor
 
-from notebook.base.handlers import APIHandler
+from jupyter_server.base.handlers import APIHandler
+from jupyter_server.extension.handler import ExtensionHandlerMixin
+
 from tornado import gen, web
 
 from ..commands import (
@@ -67,9 +69,8 @@ def _build_check_info(app_options):
 class ExtensionManager(object):
     executor = ThreadPoolExecutor(max_workers=1)
 
-    # TODO 2.0: Clean up signature to (self, app_options=None)
-    def __init__(self, log=None, app_dir=None, core_config=None, app_options=None):
-        app_options = _ensure_options(app_options, logger=log, app_dir=app_dir, core_config=core_config)
+    def __init__(self, app_options=None):
+        app_options = _ensure_options(app_options)
         self.log = app_options.logger
         self.app_dir = app_options.app_dir
         self.core_config = app_options.core_config
@@ -98,7 +99,7 @@ class ExtensionManager(object):
                         status = 'warning'
             extensions.append(_make_extension_entry(
                 name=name,
-                description=pkg_info['description'],
+                description=pkg_info.get('description', ''),
                 url=data['url'],
                 enabled=(name not in info['disabled']),
                 core=False,
@@ -113,7 +114,7 @@ class ExtensionManager(object):
             if data is not None:
                 extensions.append(_make_extension_entry(
                     name=name,
-                    description=data['description'],
+                    description=data.get('description', ''),
                     url=data.get('homepage', ''),
                     installed=False,
                     enabled=False,
@@ -208,9 +209,10 @@ class ExtensionManager(object):
             raise gen.Return(None)
 
 
-class ExtensionHandler(APIHandler):
+class ExtensionHandler(ExtensionHandlerMixin, APIHandler):
 
-    def initialize(self, manager):
+    def initialize(self, manager=None, name=None):
+        super(ExtensionHandler, self).initialize(name=name)
         self.manager = manager
 
     @web.authenticated

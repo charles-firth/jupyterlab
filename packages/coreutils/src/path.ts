@@ -39,7 +39,7 @@ export namespace PathExt {
    * @param path - The file path.
    */
   export function dirname(path: string): string {
-    let dir = removeSlash(posix.dirname(path));
+    const dir = removeSlash(posix.dirname(path));
     return dir === '.' ? '' : dir;
   }
 
@@ -59,23 +59,6 @@ export namespace PathExt {
    */
   export function extname(path: string): string {
     return posix.extname(path);
-  }
-
-  /**
-   * Get the last portion of a path, without its extension (if any).
-   *
-   * @param path - The file path.
-   *
-   * @returns the last part of the path, sans extension.
-   */
-  export function stem(path: string): string {
-    return path
-      .split('\\')
-      .pop()
-      .split('/')
-      .pop()
-      .split('.')
-      .shift();
   }
 
   /**

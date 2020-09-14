@@ -1,15 +1,23 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import { IChangedArgs, ISettingRegistry, URLExt } from '@jupyterlab/coreutils';
+import { IChangedArgs, URLExt } from '@jupyterlab/coreutils';
 
-import { each } from '@phosphor/algorithm';
+import { ISettingRegistry } from '@jupyterlab/settingregistry';
 
-import { DisposableDelegate, IDisposable } from '@phosphor/disposable';
+import {
+  nullTranslator,
+  ITranslator,
+  TranslationBundle
+} from '@jupyterlab/translation';
 
-import { Widget } from '@phosphor/widgets';
+import { each } from '@lumino/algorithm';
 
-import { ISignal, Signal } from '@phosphor/signaling';
+import { DisposableDelegate, IDisposable } from '@lumino/disposable';
+
+import { Widget } from '@lumino/widgets';
+
+import { ISignal, Signal } from '@lumino/signaling';
 
 import { Dialog, showDialog } from './dialog';
 
@@ -38,6 +46,8 @@ export class ThemeManager implements IThemeManager {
    */
   constructor(options: ThemeManager.IOptions) {
     const { host, key, splash, url } = options;
+    this.translator = options.translator || nullTranslator;
+    this._trans = this.translator.load('jupyterlab');
     const registry = options.settings;
 
     this._base = url;
@@ -69,7 +79,7 @@ export class ThemeManager implements IThemeManager {
   /**
    * A signal fired when the application theme changes.
    */
-  get themeChanged(): ISignal<this, IChangedArgs<string>> {
+  get themeChanged(): ISignal<this, IChangedArgs<string, string | null>> {
     return this._themeChanged;
   }
 
@@ -263,6 +273,13 @@ export class ThemeManager implements IThemeManager {
   }
 
   /**
+   * Get the display name of the theme.
+   */
+  getDisplayName(name: string): string {
+    return this._themes[name]?.displayName || name;
+  }
+
+  /**
    * Change a font size by a positive or negative increment.
    */
   private _incrFontSize(key: string, add: boolean = true): Promise<void> {
@@ -345,7 +362,13 @@ export class ThemeManager implements IThemeManager {
       delete requests[theme];
 
       if (!themes[fallback]) {
-        this._onError(`Neither theme ${theme} nor default ${fallback} loaded.`);
+        this._onError(
+          this._trans.__(
+            'Neither theme %1 nor default %2 loaded.',
+            theme,
+            fallback
+          )
+        );
         return;
       }
 
@@ -417,12 +440,14 @@ export class ThemeManager implements IThemeManager {
    */
   private _onError(reason: any): void {
     void showDialog({
-      title: 'Error Loading Theme',
+      title: this._trans.__('Error Loading Theme'),
       body: String(reason),
-      buttons: [Dialog.okButton({ label: 'OK' })]
+      buttons: [Dialog.okButton({ label: this._trans.__('OK') })]
     });
   }
 
+  protected translator: ITranslator;
+  private _trans: TranslationBundle;
   private _base: string;
   private _current: string | null = null;
   private _host: Widget;
@@ -435,7 +460,9 @@ export class ThemeManager implements IThemeManager {
   private _settings: ISettingRegistry.ISettings;
   private _splash: ISplashScreen | null;
   private _themes: { [key: string]: IThemeManager.ITheme } = {};
-  private _themeChanged = new Signal<this, IChangedArgs<string>>(this);
+  private _themeChanged = new Signal<this, IChangedArgs<string, string | null>>(
+    this
+  );
 }
 
 export namespace ThemeManager {
@@ -467,6 +494,11 @@ export namespace ThemeManager {
      * The url for local theme loading.
      */
     url: string;
+
+    /**
+     * The application language translator.
+     */
+    translator?: ITranslator;
   }
 }
 

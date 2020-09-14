@@ -15,6 +15,13 @@ import { NotebookPanel } from './panel';
 
 import { StaticNotebook } from './widget';
 
+import {
+  ISessionContextDialogs,
+  sessionContextDialogs
+} from '@jupyterlab/apputils';
+
+import { ITranslator } from '@jupyterlab/translation';
+
 /**
  * A widget factory for notebook panels.
  */
@@ -37,6 +44,7 @@ export class NotebookWidgetFactory extends ABCWidgetFactory<
       options.editorConfig || StaticNotebook.defaultEditorConfig;
     this._notebookConfig =
       options.notebookConfig || StaticNotebook.defaultNotebookConfig;
+    this._sessionDialogs = options.sessionDialogs || sessionContextDialogs;
   }
 
   /*
@@ -84,7 +92,7 @@ export class NotebookWidgetFactory extends ABCWidgetFactory<
     context: DocumentRegistry.IContext<INotebookModel>,
     source?: NotebookPanel
   ): NotebookPanel {
-    let nbOptions = {
+    const nbOptions = {
       rendermime: source
         ? source.content.rendermime
         : this.rendermime.clone({ resolver: context.urlResolver }),
@@ -95,7 +103,7 @@ export class NotebookWidgetFactory extends ABCWidgetFactory<
         ? source.content.notebookConfig
         : this._notebookConfig
     };
-    let content = this.contentFactory.createNotebook(nbOptions);
+    const content = this.contentFactory.createNotebook(nbOptions);
 
     return new NotebookPanel({ context, content });
   }
@@ -106,11 +114,16 @@ export class NotebookWidgetFactory extends ABCWidgetFactory<
   protected defaultToolbarFactory(
     widget: NotebookPanel
   ): DocumentRegistry.IToolbarItem[] {
-    return ToolbarItems.getDefaultItems(widget);
+    return ToolbarItems.getDefaultItems(
+      widget,
+      this._sessionDialogs,
+      this.translator
+    );
   }
 
   private _editorConfig: StaticNotebook.IEditorConfig;
   private _notebookConfig: StaticNotebook.INotebookConfig;
+  private _sessionDialogs: ISessionContextDialogs;
 }
 
 /**
@@ -146,5 +159,36 @@ export namespace NotebookWidgetFactory {
      * The notebook configuration.
      */
     notebookConfig?: StaticNotebook.INotebookConfig;
+
+    /**
+     * The session context dialogs.
+     */
+    sessionDialogs?: ISessionContextDialogs;
+
+    /**
+     * The application language translator.
+     */
+    translator?: ITranslator;
+  }
+
+  /**
+   * The interface for a notebook widget factory.
+   */
+  export interface IFactory
+    extends DocumentRegistry.IWidgetFactory<NotebookPanel, INotebookModel> {
+    /**
+     * A configuration object for cell editor settings.
+     */
+    editorConfig: StaticNotebook.IEditorConfig;
+
+    /**
+     * A configuration object for notebook settings.
+     */
+    notebookConfig: StaticNotebook.INotebookConfig;
+
+    /**
+     * Whether the kernel should be shutdown when the widget is closed.
+     */
+    shutdownOnClose: boolean;
   }
 }

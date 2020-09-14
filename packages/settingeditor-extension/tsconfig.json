@@ -16,13 +16,22 @@
       "path": "../codeeditor"
     },
     {
-      "path": "../coreutils"
-    },
-    {
       "path": "../rendermime"
     },
     {
       "path": "../settingeditor"
+    },
+    {
+      "path": "../settingregistry"
+    },
+    {
+      "path": "../statedb"
+    },
+    {
+      "path": "../translation"
+    },
+    {
+      "path": "../ui-components"
     }
   ]
 }

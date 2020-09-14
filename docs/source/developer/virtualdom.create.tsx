@@ -1,6 +1,6 @@
 import * as React from 'react';
 
-import { Widget } from '@phosphor/widgets';
+import { Widget } from '@lumino/widgets';
 import { ReactWidget } from '@jupyterlab/apputils';
 
 function MyComponent() {
@@ -8,3 +8,4 @@ function MyComponent() {
 }
 
 const myWidget: Widget = ReactWidget.create(<MyComponent />);
+Widget.attach(myWidget, document.body);
